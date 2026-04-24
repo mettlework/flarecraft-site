@@ -1,0 +1,269 @@
+---
+const experiments = [
+	{
+		number: "01",
+		title: "Hello World Worker",
+		primitive: "Workers",
+		status: "live",
+		url: "https://hello-worker.andrew-939.workers.dev",
+		description:
+			"The smallest possible Worker. A single fetch handler returning plain text. Proves the deploy loop: write → wrangler deploy → live globally in seconds.",
+	},
+	{
+		number: "02",
+		title: "Visitor Counter",
+		primitive: "Workers + KV",
+		status: "planned",
+		description:
+			"Tiny counter that increments on each request. Explores KV bindings, eventual consistency at the edge, and the capability-based security model.",
+	},
+	{
+		number: "03",
+		title: "Notes API",
+		primitive: "Workers + D1",
+		status: "planned",
+		description:
+			"CRUD over a SQLite database running inside the edge network. Explores D1 bindings, migrations, and the read-replica story.",
+	},
+	{
+		number: "04",
+		title: "Prompt Playground",
+		primitive: "Workers AI",
+		status: "planned",
+		description:
+			"Minimal UI in front of an open-source model running on Cloudflare's inference fleet. Explores the AI binding and per-token billing.",
+	},
+	{
+		number: "05",
+		title: "Asset Bucket",
+		primitive: "R2",
+		status: "planned",
+		description:
+			"Signed-URL uploads into an R2 bucket. Explores egress-free object storage and the S3-compatible API surface.",
+	},
+];
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="viewport" content="width=device-width" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Flarecraft — Experiments on the Cloudflare Developer Platform</title>
+		<meta
+			name="description"
+			content="A working portfolio of small experiments built on the Cloudflare developer platform."
+		/>
+	</head>
+	<body>
+		<main>
+			<header>
+				<p class="eyebrow">Flarecraft</p>
+				<h1>Experiments on the Cloudflare<br />Developer Platform</h1>
+				<p class="lede">
+					A working portfolio of small things built on Workers, Pages, KV, D1, R2, and Workers AI — one primitive at a time. Each experiment is deliberately minimal: enough to understand the shape, not so much that the shape is obscured.
+				</p>
+			</header>
+
+			<section class="grid">
+				{
+					experiments.map((exp) => (
+						<article class={`card card--${exp.status}`}>
+							<div class="card-header">
+								<span class="num">{exp.number}</span>
+								<span class={`badge badge--${exp.status}`}>
+									{exp.status === "live" ? "Live" : "Planned"}
+								</span>
+							</div>
+							<h2>{exp.title}</h2>
+							<p class="primitive">{exp.primitive}</p>
+							<p class="desc">{exp.description}</p>
+							{exp.url && (
+								<a class="visit" href={exp.url} target="_blank" rel="noopener">
+									Visit →
+								</a>
+							)}
+						</article>
+					))
+				}
+			</section>
+
+			<footer>
+				<p>Built with Astro. Deployed on Cloudflare Pages. Registered through Cloudflare Registrar.</p>
+			</footer>
+		</main>
+
+		<style>
+			:root {
+				--bg: #faf8f5;
+				--fg: #1a1a1a;
+				--muted: #6b6b6b;
+				--border: #e5e1db;
+				--accent: #f6821f;
+				--accent-soft: #fef1e4;
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+
+			body {
+				margin: 0;
+				font-family:
+					ui-sans-serif,
+					system-ui,
+					-apple-system,
+					BlinkMacSystemFont,
+					"Segoe UI",
+					sans-serif;
+				color: var(--fg);
+				background: var(--bg);
+				line-height: 1.55;
+				-webkit-font-smoothing: antialiased;
+			}
+
+			main {
+				max-width: 960px;
+				margin: 0 auto;
+				padding: 96px 32px 64px;
+			}
+
+			header {
+				margin-bottom: 72px;
+			}
+
+			.eyebrow {
+				margin: 0 0 24px;
+				font-size: 13px;
+				letter-spacing: 0.12em;
+				text-transform: uppercase;
+				color: var(--accent);
+				font-weight: 600;
+			}
+
+			h1 {
+				margin: 0 0 24px;
+				font-size: clamp(32px, 5vw, 52px);
+				line-height: 1.1;
+				letter-spacing: -0.02em;
+				font-weight: 700;
+			}
+
+			.lede {
+				margin: 0;
+				font-size: 18px;
+				max-width: 640px;
+				color: var(--muted);
+			}
+
+			.grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+				gap: 20px;
+				margin-bottom: 72px;
+			}
+
+			.card {
+				position: relative;
+				padding: 24px;
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				background: #fff;
+				transition: transform 0.15s ease, border-color 0.15s ease;
+			}
+
+			.card--live {
+				border-color: var(--accent);
+				background: var(--accent-soft);
+			}
+
+			.card--planned {
+				opacity: 0.72;
+			}
+
+			.card--live:hover {
+				transform: translateY(-2px);
+			}
+
+			.card-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin-bottom: 16px;
+			}
+
+			.num {
+				font-variant-numeric: tabular-nums;
+				font-size: 13px;
+				color: var(--muted);
+				letter-spacing: 0.08em;
+			}
+
+			.badge {
+				font-size: 11px;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				padding: 3px 8px;
+				border-radius: 4px;
+				font-weight: 600;
+			}
+
+			.badge--live {
+				background: var(--accent);
+				color: #fff;
+			}
+
+			.badge--planned {
+				background: #eee;
+				color: var(--muted);
+			}
+
+			h2 {
+				margin: 0 0 6px;
+				font-size: 20px;
+				letter-spacing: -0.01em;
+			}
+
+			.primitive {
+				margin: 0 0 12px;
+				font-size: 13px;
+				color: var(--accent);
+				font-weight: 600;
+			}
+
+			.card--planned .primitive {
+				color: var(--muted);
+			}
+
+			.desc {
+				margin: 0 0 20px;
+				font-size: 14px;
+				color: var(--muted);
+			}
+
+			.visit {
+				display: inline-block;
+				font-size: 14px;
+				font-weight: 600;
+				color: var(--accent);
+				text-decoration: none;
+			}
+
+			.visit:hover {
+				text-decoration: underline;
+			}
+
+			footer {
+				padding-top: 32px;
+				border-top: 1px solid var(--border);
+				font-size: 13px;
+				color: var(--muted);
+			}
+
+			footer p {
+				margin: 0;
+			}
+		</style>
+	</body>
+</html>
