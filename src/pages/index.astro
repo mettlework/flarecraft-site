@@ -81,9 +81,11 @@ const lastRunRelative = (() => {
 					What developers are shipping<br />on <i>Cloudflare</i>
 				</h1>
 				<p class="lede">
-					A daily briefing of posts, launches, and critiques from the open web,
-					classified and ranked by Workers AI. Built end-to-end on the
-					Cloudflare developer platform — the system reporting on the platform.
+					The last 24 hours, classified and ranked by Workers AI.
+				</p>
+				<p class="hero-meta">
+					<span class="serif italic">8 Cloudflare primitives <span class="hero-dot">·</span> 2 Workers <span class="hero-dot">·</span> 1 daily briefing.</span>
+					<a href="/about/" class="hero-cta">Architecture →</a>
 				</p>
 			</header>
 
@@ -185,16 +187,8 @@ const lastRunRelative = (() => {
 				</aside>
 			)}
 
-			<footer class="how">
-				<span class="eyebrow">Colophon</span>
-				<h3 class="serif">How this is built</h3>
-				<p>
-					FlareCraft is two Workers in one repo. A scheduled <span class="primitive">pipeline Worker</span> runs daily on a Cron Trigger, fetches recent posts from Hacker News, classifies each via <span class="primitive">Workers AI</span> (Llama 3.3 70B with structured JSON output), generates embeddings (BGE base), deduplicates semantically against the corpus via <span class="primitive">Vectorize</span>, persists to <span class="primitive">D1</span>, archives raw JSON to <span class="primitive">R2</span>, and emails a digest via Resend. The whole pipeline is wrapped in <span class="primitive">Workflows</span> for durable execution and per-step retries. This SSR site is the second Worker — it reads from the same D1 in the request path and renders this page server-side, no rebuild needed when the pipeline updates.
-				</p>
-				<p class="how-meta">
-					Eight Cloudflare primitives, two Workers, one product. <a href="/about/">More on the architecture →</a>
-				</p>
-			</footer>
+			{/* The full colophon moved above the items as a hero meta-line + CTA.
+				The site-wide footer (in Layout.astro) handles the brand sign-off. */}
 		</main>
 
 		<aside class="editorial-rail" aria-label="Live system status">
@@ -253,9 +247,11 @@ const lastRunRelative = (() => {
 			<hr class="rail-rule" />
 
 			<div class="rail-section">
-				<span class="eyebrow">About</span>
+				<span class="eyebrow">About the builder</span>
 				<p class="rail-text">
-					FlareCraft is a working artifact for a VP of Developer Adoption interview process at Cloudflare.
+					<strong>Andrew Moore</strong> is a Founder, Product Executive, and Builder. <a href="https://www.linkedin.com/in/richardandrewmoore/" target="_blank" rel="noopener" class="rail-link-inline">See his work →</a>
+				</p>
+				<p class="rail-text" style="margin-top: 10px;">
 					<a href="/about/" class="rail-link">Read the architecture →</a>
 				</p>
 			</div>
@@ -283,7 +279,37 @@ const lastRunRelative = (() => {
 		font-size: 18px;
 		color: var(--ink-2);
 		max-width: 580px;
+		margin: 0 0 16px;
+	}
+	.hero-meta {
 		margin: 0;
+		font-size: 16px;
+		color: var(--ink-3);
+		display: flex;
+		align-items: baseline;
+		gap: 16px;
+		flex-wrap: wrap;
+	}
+	.hero-meta .serif {
+		font-variation-settings: "SOFT" 50;
+	}
+	.hero-dot {
+		color: var(--rule-2);
+		margin: 0 4px;
+		font-style: normal;
+	}
+	.hero-cta {
+		color: var(--orange-deep);
+		text-decoration: none;
+		font-weight: 600;
+		font-family: var(--font-body);
+		font-size: 15px;
+		font-style: normal;
+		white-space: nowrap;
+	}
+	.hero-cta:hover {
+		text-decoration: underline;
+		text-underline-offset: 4px;
 	}
 
 	/* The Cut — editorial summary block above the items list */
@@ -572,6 +598,16 @@ const lastRunRelative = (() => {
 		margin-top: 6px;
 		color: var(--orange-deep);
 		text-decoration: none;
+		font-weight: 600;
+	}
+	.rail-link-inline {
+		color: var(--orange-deep);
+		text-decoration: none;
+		font-weight: 600;
+		white-space: nowrap;
+	}
+	.rail-text strong {
+		color: var(--ink);
 		font-weight: 600;
 	}
 </style>

@@ -1,5 +1,11 @@
 ---
+import { env } from "cloudflare:workers";
 import Layout from "../components/Layout.astro";
+// Anchor the cloudflare:workers binding to this page's bundle. Layout.astro
+// reads env, but Astro v6 tree-shakes its import out of pages that don't
+// reference env directly — causing ReferenceError at runtime in the layout.
+// Genuine read here ensures the binding is included.
+const siteUrl = env.SITE_URL ?? "https://flarecraft.dev";
 ---
 
 <Layout
@@ -102,7 +108,7 @@ import Layout from "../components/Layout.astro";
 				<strong>Andrew Moore</strong> is a Founder, Product Executive, and Builder. <a href="https://www.linkedin.com/in/richardandrewmoore/" target="_blank" rel="noopener">Learn more about his current and prior work here</a>.
 			</p>
 
-			<p class="prose-meta">Source on <a href="https://github.com/mettlework/flarecraft-site" target="_blank" rel="noopener">GitHub</a>.</p>
+			<p class="prose-meta">Live at <a href={siteUrl}>{siteUrl}</a> &middot; source on <a href="https://github.com/mettlework/flarecraft-site" target="_blank" rel="noopener">GitHub</a>.</p>
 		</section>
 	</div>
 </Layout>
