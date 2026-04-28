@@ -11,6 +11,30 @@ export interface BriefingRow {
 	kept_count: number;
 	status: string;
 	error: string | null;
+	summary_json: string | null;
+}
+
+export interface BriefingSummary {
+	positives: { title: string; line: string }[];
+	negatives: { title: string; line: string }[];
+}
+
+export function parseSummary(raw: string | null): BriefingSummary | null {
+	if (!raw) return null;
+	try {
+		const v = JSON.parse(raw);
+		if (
+			v &&
+			typeof v === "object" &&
+			Array.isArray(v.positives) &&
+			Array.isArray(v.negatives)
+		) {
+			return v as BriefingSummary;
+		}
+	} catch {
+		// fall through
+	}
+	return null;
 }
 
 export interface ItemRow {

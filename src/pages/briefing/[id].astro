@@ -1,7 +1,7 @@
 ---
 import { env } from "cloudflare:workers";
 import Layout from "../../components/Layout.astro";
-import { getBriefingById, parsePrimitives } from "../../lib/db";
+import { getBriefingById, parsePrimitives, parseSummary } from "../../lib/db";
 
 const { id } = Astro.params;
 const briefing = env.DB && id ? await getBriefingById(env.DB, id) : null;
@@ -9,6 +9,8 @@ const briefing = env.DB && id ? await getBriefingById(env.DB, id) : null;
 if (!briefing) {
 	return new Response(null, { status: 404, statusText: "Briefing not found" });
 }
+
+const summary = parseSummary(briefing.row.summary_json);
 
 const dateLabel = new Date(briefing.row.run_started_at).toLocaleDateString(
 	"en-US",
@@ -30,6 +32,34 @@ const dateLabel = new Date(briefing.row.run_started_at).toLocaleDateString(
 				<strong>{briefing.row.kept_count}</strong> items kept &middot; {briefing.row.classified_count} classified &middot; {briefing.row.source_count} sourced &middot; {briefing.row.deduped_count} deduplicated.
 			</p>
 		</header>
+
+		{summary && (summary.positives.length > 0 || summary.negatives.length > 0) && (
+			<section class="cut">
+				<span class="eyebrow">The cut &middot; the day's read</span>
+				<div class="cut-grid">
+					{summary.positives.length > 0 && (
+						<div class="cut-col cut-col--pos">
+							<h3 class="serif">What's working</h3>
+							<ol>
+								{summary.positives.map((p) => (
+									<li><strong>{p.title}.</strong> {p.line}</li>
+								))}
+							</ol>
+						</div>
+					)}
+					{summary.negatives.length > 0 && (
+						<div class="cut-col cut-col--neg">
+							<h3 class="serif">What's friction</h3>
+							<ol>
+								{summary.negatives.map((p) => (
+									<li><strong>{p.title}.</strong> {p.line}</li>
+								))}
+							</ol>
+						</div>
+					)}
+				</div>
+			</section>
+		)}
 
 		<section class="briefing">
 			{briefing.items.map((item, i) => {
@@ -96,6 +126,34 @@ const dateLabel = new Date(briefing.row.run_started_at).toLocaleDateString(
 		color: var(--ink);
 		font-weight: 600;
 	}
+	.cut {
+		margin: 0 0 48px;
+		padding: 28px;
+		background: var(--paper-2);
+		border-left: 3px solid var(--orange-deep);
+		border-radius: 0 4px 4px 0;
+	}
+	.cut .eyebrow { margin-bottom: 14px; }
+	.cut-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 28px;
+	}
+	@media (max-width: 760px) {
+		.cut-grid { grid-template-columns: 1fr; gap: 20px; }
+	}
+	.cut-col h3 {
+		margin: 0 0 10px;
+		font-size: 16px;
+		font-weight: 600;
+		font-variation-settings: "SOFT" 50;
+	}
+	.cut-col--pos h3::before { content: "+ "; color: var(--orange-deep); font-family: var(--font-mono); }
+	.cut-col--neg h3::before { content: "− "; color: var(--ink-3); font-family: var(--font-mono); }
+	.cut-col ol { margin: 0; padding: 0 0 0 18px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+	.cut-col li { margin-bottom: 8px; }
+	.cut-col strong { color: var(--ink); font-weight: 600; }
+
 	.item {
 		display: grid;
 		grid-template-columns: 56px 1fr;

@@ -23,6 +23,7 @@ import {
 
 import type { ClassifiedItem, Env, SourcePost } from "./env";
 import { fetchHN } from "./lib/hn";
+import { fetchReddit } from "./lib/reddit";
 import { classify } from "./lib/classify";
 import { embed } from "./lib/embed";
 import { dedupAndRegister } from "./lib/dedup";
@@ -34,6 +35,7 @@ import {
 	itemId,
 	persistItem,
 } from "./lib/persist";
+import { generateSummary } from "./lib/summary";
 import { sendDigest } from "./lib/digest";
 
 interface PipelineParams {
@@ -59,14 +61,31 @@ export class FlareCraftPipeline extends WorkflowEntrypoint<
 			return briefingId;
 		});
 
-		// 2. Pull source posts. Retried up to 3x on network blips.
+		// 2. Pull source posts from all configured sources.
+		// Sources run in parallel within the step; failures of one don't fail
+		// the others (each fetcher catches its own).
 		const posts: SourcePost[] = await step.do(
-			"fetch-hn",
+			"fetch-sources",
 			{
 				retries: { limit: 3, delay: "10 seconds", backoff: "exponential" },
-				timeout: "30 seconds",
+				timeout: "60 seconds",
 			},
-			async () => fetchHN(hoursBack),
+			async () => {
+				const [hnPosts, redditPosts] = await Promise.all([
+					fetchHN(hoursBack).catch((e) => {
+						console.warn("HN fetch failed:", e);
+						return [] as SourcePost[];
+					}),
+					fetchReddit(hoursBack).catch((e) => {
+						console.warn("Reddit fetch failed:", e);
+						return [] as SourcePost[];
+					}),
+				]);
+				console.log(
+					`Sources: HN=${hnPosts.length} Reddit=${redditPosts.length}`,
+				);
+				return [...hnPosts, ...redditPosts];
+			},
 		);
 
 		console.log(`[pipeline] starting classify-and-persist for ${posts.length} posts`);
@@ -169,12 +188,39 @@ export class FlareCraftPipeline extends WorkflowEntrypoint<
 			},
 		);
 
-		// 4. Mark briefing complete with counts.
+		// 4. Generate the editorial summary (top 3 positives / top 3 negatives).
+		// Best-effort: if the summary call fails, the rest of the run still
+		// completes — the homepage just won't have the editorial header today.
+		await step.do(
+			"generate-summary",
+			{ retries: { limit: 2, delay: "10 seconds" } },
+			async () => {
+				const items = await this.env.DB.prepare(
+					`SELECT * FROM items WHERE briefing_id = ? AND is_about_cf = 1`,
+				)
+					.bind(briefingId)
+					.all<ClassifiedItem>();
+				const summary = await generateSummary(
+					this.env,
+					items.results ?? [],
+				);
+				await this.env.DB.prepare(
+					`UPDATE briefings SET summary_json = ? WHERE id = ?`,
+				)
+					.bind(JSON.stringify(summary), briefingId)
+					.run();
+				console.log(
+					`Summary: ${summary.positives.length} positives, ${summary.negatives.length} negatives`,
+				);
+			},
+		);
+
+		// 5. Mark briefing complete with counts.
 		await step.do("finalize-briefing", async () => {
 			await finalizeBriefing(this.env, briefingId, result, "completed");
 		});
 
-		// 5. Send the email digest with the top items.
+		// 6. Send the email digest with the top items.
 		if (!skipEmail) {
 			// Hibernate briefly so the digest step gets a fresh Worker invocation
 			// with a clean subrequest budget — the classify step above can use
@@ -195,9 +241,26 @@ export class FlareCraftPipeline extends WorkflowEntrypoint<
 					)
 						.bind(briefingId)
 						.all<ClassifiedItem>();
+
+					// Pull the summary that the previous step persisted.
+					const summaryRow = await this.env.DB.prepare(
+						`SELECT summary_json FROM briefings WHERE id = ?`,
+					)
+						.bind(briefingId)
+						.first<{ summary_json: string | null }>();
+					let summary = null;
+					if (summaryRow?.summary_json) {
+						try {
+							summary = JSON.parse(summaryRow.summary_json);
+						} catch {
+							summary = null;
+						}
+					}
+
 					await sendDigest(this.env, {
 						briefingId,
 						items: items.results ?? [],
+						summary,
 					});
 				},
 			);

@@ -25,13 +25,16 @@ The artifact is intended to signal four things at once:
 
 Every day at 08:00 CDT a Cloudflare Cron Trigger fires. A Workflow runs that:
 
-1. **Fetches** the last 24 hours of Hacker News posts and comments mentioning Cloudflare via the Algolia HN API
+1. **Fetches** the last 24 hours of posts mentioning Cloudflare from two source classes:
+   - **Hacker News** (stories + comments) via the Algolia HN API
+   - **Reddit** — r/CloudFlare and r/cloudflaredev (whole-sub on-topic), plus search-within-sub for "cloudflare" mentions on r/aws, r/vercel, and r/selfhosted (where the comparison/migration stories live)
 2. **Classifies** each post via Workers AI (Llama 3.3 70B with structured JSON output): is this actually about building on the platform, which primitives are involved, what's the angle, and how interesting is it on a 1–5 scale
 3. **Embeds** each kept post via Workers AI (BGE base, 768 dims) and queries Vectorize for the nearest neighbor in the existing corpus — if cosine similarity ≥ 0.92, treats it as a semantic duplicate and skips
 4. **Persists** survivors to D1, archives raw normalized JSON to R2 keyed by `date/source/id`
-5. **Finalizes** the briefing record with run counts
-6. **Sleeps** briefly (a `step.sleep` checkpoint) so the digest step gets a fresh Worker invocation with a clean subrequest budget
-7. **Emails** the top items as an HTML digest via Resend, while Beehiiv handles public subscriber capture at `flare-craft.beehiiv.com`
+5. **Generates the editorial summary** (top 3 positives + top 3 negatives) via a second Workers AI call — the day's "cut" that runs above the items list
+6. **Finalizes** the briefing record with run counts
+7. **Sleeps** briefly (a `step.sleep` checkpoint) so the digest step gets a fresh Worker invocation with a clean subrequest budget
+8. **Emails** the top items as an HTML digest via Resend, while Beehiiv handles public subscriber capture at `flare-craft.beehiiv.com`
 
 A separate SSR Worker reads from D1 in the request path and renders the live briefing at flarecraft.dev — no rebuild needed when the pipeline updates the data.
 
@@ -192,11 +195,11 @@ curl -X POST https://flarecraft-pipeline.<subdomain>.workers.dev/run \
 
 ## Extending
 
-To add a new source (Reddit, dev.to, RSS):
+To add a new source (dev.to, Lobsters, RSS, etc.):
 
 1. Add `pipeline/src/lib/<source>.ts` exporting `() => Promise<SourcePost[]>`
-2. Call it from `workflow.ts`'s fetch step alongside `fetchHN()`, concatenate
-3. The schema is already source-agnostic; classifications and embeddings flow unchanged
+2. Call it from `workflow.ts`'s `fetch-sources` step alongside `fetchHN()` and `fetchReddit()`, concatenate
+3. The schema is already source-agnostic — classifications, embeddings, and the summary flow unchanged. Add the new value to the `SourceName` type union in `pipeline/src/env.ts`.
 
 ---
 

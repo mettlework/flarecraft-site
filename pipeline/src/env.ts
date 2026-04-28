@@ -30,11 +30,13 @@ export interface Env {
 	RESEND_API_KEY: string;
 }
 
+export type SourceName = "hn" | "reddit";
+
 // Shape of items stored in D1 — matches schema.sql
 export interface ClassifiedItem {
 	id: string;
 	briefing_id: string;
-	source: "hn";
+	source: SourceName;
 	source_id: string;
 	url: string;
 	title: string;
@@ -67,13 +69,19 @@ export interface Classification {
 		| "misc";
 }
 
-// Normalized post from any source (HN today, more later)
+// Normalized post from any source
 export interface SourcePost {
-	source: "hn";
+	source: SourceName;
 	source_id: string;
 	url: string;
 	title: string;
 	body: string; // raw text for classification context
 	author: string | null;
 	posted_at: number; // ms
+}
+
+// Summary attached to each completed briefing — top-3 positives + top-3 negatives
+export interface BriefingSummary {
+	positives: { title: string; line: string }[];
+	negatives: { title: string; line: string }[];
 }

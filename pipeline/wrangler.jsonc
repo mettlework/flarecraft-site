@@ -47,11 +47,10 @@
 
 	"vars": {
 		"DIGEST_RECIPIENT": "andrew@mettlework.io",
-		// Resend free tier sends from onboarding@resend.dev until we verify
-		// flarecraft.dev as a sending domain (DNS records: SPF, DKIM, DMARC).
-		// Switching to "FlareCraft <notes@flarecraft.dev>" is a one-line change
-		// once those records propagate.
-		"DIGEST_SENDER": "FlareCraft <onboarding@resend.dev>",
+		// Resend verified flarecraft.dev as a sending domain via their
+		// auto-Cloudflare DNS integration (SPF + DKIM + DMARC records added
+		// directly to the zone). Sender is now properly branded.
+		"DIGEST_SENDER": "FlareCraft <notes@flarecraft.dev>",
 		"SITE_URL": "https://flarecraft.dev"
 	}
 }

@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS briefings (
 	deduped_count INTEGER NOT NULL DEFAULT 0,
 	kept_count INTEGER NOT NULL DEFAULT 0,
 	status TEXT NOT NULL DEFAULT 'running', -- running | completed | failed
-	error TEXT
+	error TEXT,
+	summary_json TEXT -- JSON: {positives:[{title,line}], negatives:[{title,line}]}
 );
 
 CREATE TABLE IF NOT EXISTS items (
