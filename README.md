@@ -8,22 +8,22 @@ Live at [**flarecraft.dev**](https://flarecraft.dev). Daily email digest sent ea
 
 ## Why this exists
 
-I built FlareCraft as a working artifact for a VP of Developer Adoption interview process at Cloudflare.
+FlareCraft is my hands-on evaluation of the Cloudflare developer platform — built using the platform itself.
 
-A daily briefing of what developers are shipping on a platform is exactly the kind of work a developer adoption function does. So FlareCraft does that work — using the platform itself. The act of building it is the demonstration; the artifact persists as a useful tool. **The system reporting on the platform is the platform.**
+A daily briefing of what developers are shipping on a platform is exactly the kind of work a developer adoption function does. So FlareCraft does that work — composed end-to-end on eight Cloudflare primitives across two Workers. The act of building it is the evaluation; the artifact persists as a useful tool. **The system reporting on the platform is the platform.**
 
-The artifact is intended to signal four things at once:
+**What the build revealed:**
 
-1. **Platform fluency** — composing eight Cloudflare primitives in service of one product, not just deploying hello-worlds
-2. **Taste** — knowing what to build, what to skip, what to defend
-3. **Shipping discipline** — production-grade end-to-end in under a day
-4. **Strategic empathy** — building something the audience would actually find useful
+1. **Composition cost is genuinely low.** Eight primitives in service of one daily-running product, two Workers, ~600 lines of TypeScript. The same shape on AWS would require multiple services, IAM glue between them, and meaningfully more orchestration code.
+2. **The defaults punch up.** TLS, anycast routing, CDN caching, observability — all default-on. The surface area a developer has to touch is small.
+3. **Fast-moving primitives have rough edges.** Subrequest budgets, tier-gated APIs surfacing at runtime, scaffold tooling lagging the current Wrangler — full inventory in the [frictions section](#honest-tradeoffs-and-known-frictions). These aren't deal-breakers; they're the surface area of a platform shipping fast.
+4. **The two-platform handshakes are the differentiator.** Resend's "add domain" flow auto-detected my Cloudflare zone and wrote SPF/DKIM/DMARC records via Cloudflare's API directly. Most cloud platforms can't pull that off because they don't share a credential model with the rest of the developer's stack.
 
 ---
 
 ## What it does
 
-Every day at 08:00 CDT a Cloudflare Cron Trigger fires. A Workflow runs that:
+Every day at 07:00 CT a Cloudflare Cron Trigger fires. A Workflow runs that:
 
 1. **Fetches** the last 24 hours of posts mentioning Cloudflare from two source classes:
    - **Hacker News** (stories + comments) via the Algolia HN API
@@ -31,7 +31,7 @@ Every day at 08:00 CDT a Cloudflare Cron Trigger fires. A Workflow runs that:
 2. **Classifies** each post via Workers AI (Llama 3.3 70B with structured JSON output): is this actually about building on the platform, which primitives are involved, what's the angle, and how interesting is it on a 1–5 scale
 3. **Embeds** each kept post via Workers AI (BGE base, 768 dims) and queries Vectorize for the nearest neighbor in the existing corpus — if cosine similarity ≥ 0.92, treats it as a semantic duplicate and skips
 4. **Persists** survivors to D1, archives raw normalized JSON to R2 keyed by `date/source/id`
-5. **Generates the editorial summary** (top 3 positives + top 3 negatives) via a second Workers AI call — the day's "cut" that runs above the items list
+5. **Generates "The Cut"** — a daily editorial summary picking the top 3 positives and top 3 negatives via a second Workers AI call, with each line linking back to its source post. Runs above the items list on the site and atop the email digest.
 6. **Finalizes** the briefing record with run counts
 7. **Sleeps** briefly (a `step.sleep` checkpoint) so the digest step gets a fresh Worker invocation with a clean subrequest budget
 8. **Emails** the top items as an HTML digest via Resend, while Beehiiv handles public subscriber capture at `flare-craft.beehiiv.com`
@@ -99,7 +99,7 @@ A separate SSR Worker reads from D1 in the request path and renders the live bri
 |---|---|
 | **Workers** | Two: site (SSR) and pipeline. Same runtime, different roles. |
 | **Workflows** | Durable orchestration of the daily pipeline. Each step is a checkpointed `step.do` with its own retry policy. A Worker crash mid-run resumes at the last completed step. |
-| **Cron Triggers** | Daily 08:00 CDT schedule, registered as one line in `wrangler.jsonc`. |
+| **Cron Triggers** | Daily 07:00 CT schedule (`0 12 * * *` UTC), registered as one line in `wrangler.jsonc`. |
 | **Workers AI — Llama 3.3 70B** | Classification with structured JSON output (`response_format: json_schema`) — no parse brittleness. |
 | **Workers AI — BGE Base (768d)** | Embeddings of `title + one_liner` for semantic dedup. |
 | **Vectorize** | Stores the embedding corpus. New posts query top-1 nearest neighbor; cosine ≥ 0.92 → duplicate. |
@@ -120,7 +120,7 @@ The dual-platform split is deliberate: Beehiiv's programmatic publish API is gat
 - **Cloudflare Agents SDK.** Considered and rejected. Agents SDK is shaped for stateful chat/tool-use agents on top of Durable Objects. FlareCraft is a stateless scheduled pipeline — Workflows is the correct abstraction. Picking a primitive because it's trendy is anti-signal.
 - **Hash-on-URL deduplication.** Cheaper, but lets near-duplicates through. Vectorize embedding similarity catches the case where the same launch gets posted across multiple HN threads — semantic redundancy, which is the actual shape of the dedup problem.
 - **Per-post Workflow steps.** Tempting (clean checkpoints!), but each step is a state-machine transition with metadata overhead. For batch processing the Cloudflare-recommended pattern is the inner loop inside one `step.do` and outer steps marking phases.
-- **Reddit and dev.to ingestion.** Scoped out of v1 to ship clean. Adding sources is a single function in `pipeline/src/lib/`, returning `SourcePost[]`. The schema is source-agnostic.
+- **dev.to and Lobsters ingestion.** Scoped out for v1 to ship clean. The schema is already source-agnostic; adding a source is a single function in `pipeline/src/lib/` returning `SourcePost[]`. (Hacker News and five Reddit subs are live.)
 - **Browser Rendering.** Most HN posts that matter are link posts; title plus an excerpt is enough signal. Browser Rendering would add latency and cost without clear recall gains at this scale.
 - **One Worker doing everything.** Astro v6's `@astrojs/cloudflare` adapter doesn't natively host a Workflow class export, which forces a two-Worker split. The cleaner production pattern is honest separation anyway.
 
@@ -134,6 +134,7 @@ The dual-platform split is deliberate: Beehiiv's programmatic publish API is gat
   - Workers AI's `response_format: json_schema` returns one of three different shapes depending on model — `{response: string}`, `{response: object}`, or the bare object. Caller has to coerce.
   - Vectorize's `returnMetadata` parameter accepts `"none" | "indexed" | "all"`, not booleans — type errors only at runtime.
   - Wrangler 4's experimental auto-provisioning created the missing `SESSION` KV namespace on the fly during deploy — beautiful when it works; could surprise a less attentive deployer.
+  - The `@astrojs/cloudflare` adapter tree-shakes `cloudflare:workers` env imports out of pages that don't reference env directly, even when a child layout component does — causing a runtime `ReferenceError: env is not defined` only on those pages. Fix: anchor with a real `env.X` read in each page's frontmatter. Subtle bug; only visible in production.
   - Workers Free's 50 subrequest/invocation limit pooled across the entire workflow run, not per `step.do` as I'd assumed. The `send-digest` step inherited an exhausted budget. Fix: a `step.sleep` checkpoint before digest forces a fresh invocation. Belt-and-suspenders: also upgraded to Workers Paid for the 1,000 subrequest ceiling.
   - Beehiiv's Posts API (programmatic publish) is enterprise-tier-only. The runtime 403 forced the Beehiiv-for-audience + Resend-for-send split — which turned out to be the more honest architecture.
   - Workflow `step.do` callbacks return `void`, but a long-running step that hits an internal Workflow runtime error retries with the same `step.do` name; on retry the step's prior `console.log` output is lost from the dashboard view (only the retry shows). Made debugging the first kept-count-zero run slower than necessary.
@@ -164,8 +165,10 @@ flarecraft-site/
 │       ├── env.ts
 │       └── lib/
 │           ├── hn.ts          # Algolia HN client
-│           ├── classify.ts    # Workers AI classification
-│           ├── embed.ts       # Workers AI embeddings
+│           ├── reddit.ts      # Reddit public JSON API (5 subreddits)
+│           ├── classify.ts    # Workers AI classification (Llama 3.3 70B)
+│           ├── summary.ts     # Workers AI editorial summary (top 3 + / 3 −)
+│           ├── embed.ts       # Workers AI embeddings (BGE base, 768d)
 │           ├── dedup.ts       # Vectorize dedup
 │           ├── persist.ts     # D1 + R2 writers
 │           └── digest.ts      # Resend email
@@ -194,6 +197,14 @@ curl -X POST https://flarecraft-pipeline.<subdomain>.workers.dev/run \
   -H "Authorization: Bearer $PIPELINE_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"hoursBack": 24, "skipEmail": false}'
+
+# Republish the most recent briefing's email (e.g. after a delivery failure)
+curl -X POST https://flarecraft-pipeline.<subdomain>.workers.dev/republish-latest \
+  -H "Authorization: Bearer $PIPELINE_AUTH_TOKEN"
+
+# Regenerate the summary for a specific briefing
+curl -X POST "https://flarecraft-pipeline.<subdomain>.workers.dev/regenerate-summary?briefing=brf-..." \
+  -H "Authorization: Bearer $PIPELINE_AUTH_TOKEN"
 ```
 
 ## Extending

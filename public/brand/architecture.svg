@@ -90,7 +90,7 @@
 		<!-- Cron Trigger -->
 		<rect x="340" y="252" width="440" height="36" rx="3" class="pill-cron" />
 		<circle cx="358" cy="270" r="4" fill="#e35a14" />
-		<text x="372" y="274" class="t-step"><tspan font-weight="600">Cron Trigger</tspan> &#8226; <tspan font-family="'JetBrains Mono', monospace" font-size="11" fill="#6b675e">0 13 * * * UTC</tspan> &#8226; daily 08:00 CDT</text>
+		<text x="372" y="274" class="t-step"><tspan font-weight="600">Cron Trigger</tspan> &#8226; <tspan font-family="'JetBrains Mono', monospace" font-size="11" fill="#6b675e">0 12 * * * UTC</tspan> &#8226; daily 07:00 CT</text>
 		<circle cx="765" cy="270" r="11" class="badge" />
 		<text x="765" y="274" class="t-num" text-anchor="middle">3</text>
 

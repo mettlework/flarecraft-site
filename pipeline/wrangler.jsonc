@@ -42,7 +42,11 @@
 	],
 
 	"triggers": {
-		"crons": ["0 13 * * *"]
+		// 12:00 UTC = 07:00 CT during CDT (March–November). Cloudflare cron
+		// expressions are always UTC and don't shift for DST, so this slips
+		// to 06:00 CT during CST (November–March). Acceptable; can re-pin
+		// twice a year if we care about exact 7am-local year-round.
+		"crons": ["0 12 * * *"]
 	},
 
 	"vars": {

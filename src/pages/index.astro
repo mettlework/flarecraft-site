@@ -27,11 +27,11 @@ const stats = env.DB
 	: { briefingCount: 0, itemsKept: 0, sourcesScanned: 0, lastRunAt: null };
 const topPrimitives = env.DB ? await getTopPrimitives(env.DB, 6) : [];
 
-// Compute time until next 13:00 UTC cron run.
+// Compute time until next 12:00 UTC cron run (= 07:00 CT during CDT).
 function nextRunInfo(): { absolute: string; relative: string } {
 	const now = new Date();
 	const next = new Date(now);
-	next.setUTCHours(13, 0, 0, 0);
+	next.setUTCHours(12, 0, 0, 0);
 	if (next.getTime() <= now.getTime()) {
 		next.setUTCDate(next.getUTCDate() + 1);
 	}
