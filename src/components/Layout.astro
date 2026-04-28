@@ -53,7 +53,20 @@ const ogImage = `${siteUrl}/brand/og-image.svg`;
 				</svg>
 				<span class="wordmark">Flare<i>Craft</i></span>
 			</a>
-			<nav class="topnav-links">
+
+			<button
+				class="menu-toggle"
+				aria-label="Open menu"
+				aria-expanded="false"
+				aria-controls="primary-nav"
+				type="button"
+			>
+				<span class="menu-bar" aria-hidden="true"></span>
+				<span class="menu-bar" aria-hidden="true"></span>
+				<span class="menu-bar" aria-hidden="true"></span>
+			</button>
+
+			<nav id="primary-nav" class="topnav-links" aria-label="Primary">
 				<a href="/archive/">Archive</a>
 				<a href="/about/">Architecture</a>
 				{subscribeUrl && (
@@ -63,6 +76,53 @@ const ogImage = `${siteUrl}/brand/og-image.svg`;
 				)}
 			</nav>
 		</header>
+
+		<script is:inline>
+			(() => {
+				const toggle = document.querySelector(".menu-toggle");
+				const nav = document.querySelector(".topnav-links");
+				if (!toggle || !nav) return;
+
+				const open = () => {
+					toggle.setAttribute("aria-expanded", "true");
+					toggle.setAttribute("aria-label", "Close menu");
+					nav.classList.add("is-open");
+					document.body.classList.add("menu-open");
+				};
+				const close = () => {
+					toggle.setAttribute("aria-expanded", "false");
+					toggle.setAttribute("aria-label", "Open menu");
+					nav.classList.remove("is-open");
+					document.body.classList.remove("menu-open");
+				};
+
+				toggle.addEventListener("click", () => {
+					if (toggle.getAttribute("aria-expanded") === "true") close();
+					else open();
+				});
+
+				// Close on link click (in-page nav should dismiss the sheet)
+				nav.querySelectorAll("a").forEach((a) => {
+					a.addEventListener("click", close);
+				});
+
+				// Close on Escape
+				document.addEventListener("keydown", (e) => {
+					if (e.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") {
+						close();
+						toggle.focus();
+					}
+				});
+
+				// Close if viewport grows past breakpoint while open
+				const mq = window.matchMedia("(min-width: 721px)");
+				const handleMq = () => {
+					if (mq.matches) close();
+				};
+				if (mq.addEventListener) mq.addEventListener("change", handleMq);
+				else mq.addListener(handleMq);
+			})();
+		</script>
 
 		<slot />
 
@@ -222,6 +282,118 @@ const ogImage = `${siteUrl}/brand/og-image.svg`;
 				margin: 0 auto;
 				padding: 24px 32px;
 				border-bottom: 1px solid var(--rule);
+				position: relative;
+				z-index: 110;
+				background: var(--paper);
+			}
+
+			/* Hamburger button — hidden on desktop, shown under 720px */
+			.menu-toggle {
+				display: none;
+				background: transparent;
+				border: 0;
+				padding: 0;
+				width: 44px;
+				height: 44px;
+				margin: -10px -8px -10px 0;
+				cursor: pointer;
+				flex-direction: column;
+				justify-content: center;
+				align-items: center;
+				gap: 5px;
+				z-index: 120;
+			}
+			.menu-toggle:focus-visible {
+				outline: 2px solid var(--orange-deep);
+				outline-offset: 2px;
+				border-radius: 3px;
+			}
+			.menu-bar {
+				display: block;
+				width: 22px;
+				height: 2px;
+				background: var(--ink);
+				border-radius: 1px;
+				transform-origin: center;
+				transition:
+					transform 0.3s var(--ease),
+					opacity 0.18s var(--ease);
+			}
+			/* Hamburger → X animation */
+			.menu-toggle[aria-expanded="true"] .menu-bar:nth-child(1) {
+				transform: translateY(7px) rotate(45deg);
+			}
+			.menu-toggle[aria-expanded="true"] .menu-bar:nth-child(2) {
+				opacity: 0;
+				transform: scaleX(0.4);
+			}
+			.menu-toggle[aria-expanded="true"] .menu-bar:nth-child(3) {
+				transform: translateY(-7px) rotate(-45deg);
+			}
+
+			body.menu-open {
+				overflow: hidden;
+			}
+
+			@media (max-width: 720px) {
+				.topnav {
+					padding: 20px 24px;
+				}
+				.menu-toggle {
+					display: flex;
+				}
+				.topnav-links {
+					position: fixed;
+					top: 73px;
+					left: 0;
+					right: 0;
+					bottom: 0;
+					background: var(--paper);
+					flex-direction: column;
+					align-items: stretch;
+					gap: 0;
+					padding: 8px 24px 32px;
+					font-size: 17px;
+					transform: translateY(-12px);
+					opacity: 0;
+					pointer-events: none;
+					transition:
+						transform 0.28s var(--ease),
+						opacity 0.22s var(--ease);
+					z-index: 100;
+					border-top: 1px solid var(--rule);
+					overflow-y: auto;
+				}
+				.topnav-links.is-open {
+					transform: translateY(0);
+					opacity: 1;
+					pointer-events: auto;
+				}
+				.topnav-links a {
+					display: block;
+					padding: 18px 0;
+					border-bottom: 1px solid var(--rule);
+					font-family: var(--font-serif);
+					font-size: 22px;
+					font-weight: 600;
+					font-variation-settings: "SOFT" 50;
+					color: var(--ink);
+				}
+				.topnav-links a:hover {
+					color: var(--orange-deep);
+				}
+				.topnav-links .subscribe-cta {
+					margin-top: 24px;
+					text-align: center;
+					padding: 16px;
+					font-family: var(--font-body);
+					font-size: 16px;
+					border-bottom: 0;
+					border-radius: 4px;
+				}
+				.topnav-links .subscribe-cta:hover {
+					color: var(--paper) !important;
+				}
 			}
 			.brand-link {
 				display: inline-flex;
