@@ -12,6 +12,14 @@ if (!briefing) {
 
 const summary = parseSummary(briefing.row.summary_json);
 
+const itemUrlByTitle = new Map<string, string>();
+for (const item of briefing.items) {
+	itemUrlByTitle.set(item.title.trim(), item.url);
+}
+function urlForTitle(title: string): string | null {
+	return itemUrlByTitle.get(title.trim()) ?? null;
+}
+
 const dateLabel = new Date(briefing.row.run_started_at).toLocaleDateString(
 	"en-US",
 	{
@@ -41,9 +49,21 @@ const dateLabel = new Date(briefing.row.run_started_at).toLocaleDateString(
 						<div class="cut-col cut-col--pos">
 							<h3 class="serif">What's working</h3>
 							<ol>
-								{summary.positives.map((p) => (
-									<li><strong>{p.title}.</strong> {p.line}</li>
-								))}
+								{summary.positives.map((p) => {
+									const url = urlForTitle(p.title);
+									return (
+										<li>
+											{url ? (
+												<a href={url} target="_blank" rel="noopener" class="cut-link">
+													<strong>{p.title}.</strong>
+												</a>
+											) : (
+												<strong>{p.title}.</strong>
+											)}
+											{" "}{p.line}
+										</li>
+									);
+								})}
 							</ol>
 						</div>
 					)}
@@ -51,9 +71,21 @@ const dateLabel = new Date(briefing.row.run_started_at).toLocaleDateString(
 						<div class="cut-col cut-col--neg">
 							<h3 class="serif">What's friction</h3>
 							<ol>
-								{summary.negatives.map((p) => (
-									<li><strong>{p.title}.</strong> {p.line}</li>
-								))}
+								{summary.negatives.map((p) => {
+									const url = urlForTitle(p.title);
+									return (
+										<li>
+											{url ? (
+												<a href={url} target="_blank" rel="noopener" class="cut-link">
+													<strong>{p.title}.</strong>
+												</a>
+											) : (
+												<strong>{p.title}.</strong>
+											)}
+											{" "}{p.line}
+										</li>
+									);
+								})}
 							</ol>
 						</div>
 					)}
@@ -153,6 +185,8 @@ const dateLabel = new Date(briefing.row.run_started_at).toLocaleDateString(
 	.cut-col ol { margin: 0; padding: 0 0 0 18px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
 	.cut-col li { margin-bottom: 8px; }
 	.cut-col strong { color: var(--ink); font-weight: 600; }
+	.cut-link { color: inherit; text-decoration: none; border-bottom: 1px solid var(--rule-2); transition: color .15s var(--ease), border-color .15s var(--ease); }
+	.cut-link:hover { color: var(--orange-deep); border-bottom-color: var(--orange-deep); }
 
 	.item {
 		display: grid;

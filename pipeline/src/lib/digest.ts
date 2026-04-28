@@ -77,6 +77,10 @@ function renderHtml(p: DigestPayload, siteUrl: string): string {
 		const { positives, negatives } = p.summary;
 		if (positives.length === 0 && negatives.length === 0) return "";
 
+		// Title→url lookup so summary entries link to their source posts.
+		const urlByTitle = new Map<string, string>();
+		for (const it of p.items) urlByTitle.set(it.title.trim(), it.url);
+
 		const renderCol = (
 			heading: string,
 			items: { title: string; line: string }[],
@@ -85,10 +89,13 @@ function renderHtml(p: DigestPayload, siteUrl: string): string {
 		) => {
 			if (items.length === 0) return "";
 			const lis = items
-				.map(
-					(it) =>
-						`<li style="margin-bottom:8px;"><strong style="color:#1d1d1b;font-weight:600;">${escape(it.title)}.</strong> ${escape(it.line)}</li>`,
-				)
+				.map((it) => {
+					const url = urlByTitle.get(it.title.trim());
+					const titleHtml = url
+						? `<a href="${escape(url)}" style="color:#1d1d1b;text-decoration:none;border-bottom:1px solid #d4cfc3;font-weight:600;">${escape(it.title)}.</a>`
+						: `<strong style="color:#1d1d1b;font-weight:600;">${escape(it.title)}.</strong>`;
+					return `<li style="margin-bottom:8px;">${titleHtml} ${escape(it.line)}</li>`;
+				})
 				.join("");
 			return `<td style="vertical-align:top;width:50%;padding-right:12px;">
 				<div style="font-family:Fraunces,Georgia,serif;font-weight:600;font-size:15px;color:#1d1d1b;margin-bottom:10px;">

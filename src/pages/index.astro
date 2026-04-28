@@ -11,6 +11,17 @@ import {
 
 const briefing = env.DB ? await getLatestBriefing(env.DB) : null;
 const summary = briefing ? parseSummary(briefing.row.summary_json) : null;
+
+// Build a title→url map so summary entries can link back to their
+// source post. The summary AI returns the exact title verbatim;
+// we trim/normalize to avoid whitespace mismatches.
+const itemUrlByTitle = new Map<string, string>();
+for (const item of briefing?.items ?? []) {
+	itemUrlByTitle.set(item.title.trim(), item.url);
+}
+function urlForTitle(title: string): string | null {
+	return itemUrlByTitle.get(title.trim()) ?? null;
+}
 const stats = env.DB
 	? await getCorpusStats(env.DB)
 	: { briefingCount: 0, itemsKept: 0, sourcesScanned: 0, lastRunAt: null };
@@ -97,12 +108,21 @@ const lastRunRelative = (() => {
 							<div class="cut-col cut-col--pos">
 								<h3 class="serif">What's working</h3>
 								<ol>
-									{summary.positives.map((p) => (
-										<li>
-											<strong>{p.title}.</strong>
-											<span> {p.line}</span>
-										</li>
-									))}
+									{summary.positives.map((p) => {
+										const url = urlForTitle(p.title);
+										return (
+											<li>
+												{url ? (
+													<a href={url} target="_blank" rel="noopener" class="cut-link">
+														<strong>{p.title}.</strong>
+													</a>
+												) : (
+													<strong>{p.title}.</strong>
+												)}
+												<span> {p.line}</span>
+											</li>
+										);
+									})}
 								</ol>
 							</div>
 						)}
@@ -110,12 +130,21 @@ const lastRunRelative = (() => {
 							<div class="cut-col cut-col--neg">
 								<h3 class="serif">What's friction</h3>
 								<ol>
-									{summary.negatives.map((p) => (
-										<li>
-											<strong>{p.title}.</strong>
-											<span> {p.line}</span>
-										</li>
-									))}
+									{summary.negatives.map((p) => {
+										const url = urlForTitle(p.title);
+										return (
+											<li>
+												{url ? (
+													<a href={url} target="_blank" rel="noopener" class="cut-link">
+														<strong>{p.title}.</strong>
+													</a>
+												) : (
+													<strong>{p.title}.</strong>
+												)}
+												<span> {p.line}</span>
+											</li>
+										);
+									})}
 								</ol>
 							</div>
 						)}
@@ -366,6 +395,16 @@ const lastRunRelative = (() => {
 	.cut-col strong {
 		color: var(--ink);
 		font-weight: 600;
+	}
+	.cut-link {
+		color: inherit;
+		text-decoration: none;
+		border-bottom: 1px solid var(--rule-2);
+		transition: border-color 0.15s var(--ease), color 0.15s var(--ease);
+	}
+	.cut-link:hover {
+		color: var(--orange-deep);
+		border-bottom-color: var(--orange-deep);
 	}
 
 	.briefing {
