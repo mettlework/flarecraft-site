@@ -72,10 +72,10 @@ export default {
 			const { sendDigest } = await import("./lib/digest");
 
 			const briefing = await env.DB.prepare(
-				`SELECT id FROM briefings
+				`SELECT id, summary_json FROM briefings
 				 WHERE status = 'completed' AND kept_count > 0
 				 ORDER BY run_started_at DESC LIMIT 1`,
-			).first<{ id: string }>();
+			).first<{ id: string; summary_json: string | null }>();
 
 			if (!briefing) {
 				return Response.json(
@@ -93,14 +93,75 @@ export default {
 				.bind(briefing.id)
 				.all();
 
+			let summary = null;
+			if (briefing.summary_json) {
+				try {
+					summary = JSON.parse(briefing.summary_json);
+				} catch {
+					summary = null;
+				}
+			}
+
 			await sendDigest(env, {
 				briefingId: briefing.id,
 				items: (items.results ?? []) as never,
+				summary,
 			});
 
 			return Response.json({
 				republished: briefing.id,
 				items: items.results?.length ?? 0,
+				hasSummary: !!summary,
+			});
+		}
+
+		// Re-generate the summary for an existing briefing. Useful when the
+		// summary step ran during a failed attempt or got out-of-sync with
+		// the items that survived. POST /regenerate-summary?briefing=brf-...
+		if (
+			url.pathname === "/regenerate-summary" &&
+			request.method === "POST"
+		) {
+			const auth = request.headers.get("authorization");
+			if (auth !== `Bearer ${env.PIPELINE_AUTH_TOKEN}`) {
+				return new Response("Unauthorized", { status: 401 });
+			}
+
+			const briefingId = url.searchParams.get("briefing");
+			if (!briefingId) {
+				return Response.json(
+					{ error: "missing ?briefing=" },
+					{ status: 400 },
+				);
+			}
+
+			const { generateSummary } = await import("./lib/summary");
+			const items = await env.DB.prepare(
+				`SELECT * FROM items WHERE briefing_id = ? AND is_about_cf = 1`,
+			)
+				.bind(briefingId)
+				.all();
+
+			if ((items.results ?? []).length === 0) {
+				return Response.json(
+					{ error: "no items for briefing", briefingId },
+					{ status: 404 },
+				);
+			}
+
+			const summary = await generateSummary(env, (items.results ?? []) as never);
+			await env.DB.prepare(
+				`UPDATE briefings SET summary_json = ?, kept_count = ? WHERE id = ?`,
+			)
+				.bind(JSON.stringify(summary), items.results?.length ?? 0, briefingId)
+				.run();
+
+			return Response.json({
+				briefingId,
+				items: items.results?.length ?? 0,
+				positives: summary.positives.length,
+				negatives: summary.negatives.length,
+				summary,
 			});
 		}
 

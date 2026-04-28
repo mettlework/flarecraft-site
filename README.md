@@ -136,6 +136,9 @@ The dual-platform split is deliberate: Beehiiv's programmatic publish API is gat
   - Wrangler 4's experimental auto-provisioning created the missing `SESSION` KV namespace on the fly during deploy — beautiful when it works; could surprise a less attentive deployer.
   - Workers Free's 50 subrequest/invocation limit pooled across the entire workflow run, not per `step.do` as I'd assumed. The `send-digest` step inherited an exhausted budget. Fix: a `step.sleep` checkpoint before digest forces a fresh invocation. Belt-and-suspenders: also upgraded to Workers Paid for the 1,000 subrequest ceiling.
   - Beehiiv's Posts API (programmatic publish) is enterprise-tier-only. The runtime 403 forced the Beehiiv-for-audience + Resend-for-send split — which turned out to be the more honest architecture.
+  - Workflow `step.do` callbacks return `void`, but a long-running step that hits an internal Workflow runtime error retries with the same `step.do` name; on retry the step's prior `console.log` output is lost from the dashboard view (only the retry shows). Made debugging the first kept-count-zero run slower than necessary.
+  - The `finalize-briefing` step succeeded according to the Workflow dashboard but its D1 UPDATE didn't actually land in this run — possibly a transactional artifact of the retry. Added `/regenerate-summary` and a manual SQL patch for recovery; in production I'd want a verifier step that reads back the row after `finalize-briefing` and retries on mismatch.
+  - **A pleasant surprise to balance the friction list:** Resend's domain-add flow detected my Cloudflare zone and added the SPF/DKIM/DMARC records via Cloudflare's API directly — no manual DNS work. That's the kind of two-platform handshake that makes a real friction step disappear.
 
 These aren't complaints; they're the surface area of a fast-moving platform mid-consolidation. Naming them is part of the job.
 
@@ -203,4 +206,4 @@ To add a new source (dev.to, Lobsters, RSS, etc.):
 
 ---
 
-Built by [Andrew Holmes](https://github.com/mettlework). The portfolio of attempts that led here is in the git log; the artifact you can use is here.
+Built by **Andrew Moore** — Founder, Product Executive, and Builder. Learn more about current and prior work at [linkedin.com/in/richardandrewmoore](https://www.linkedin.com/in/richardandrewmoore/). The portfolio of attempts that led here is in the git log; the artifact you can use is here.
