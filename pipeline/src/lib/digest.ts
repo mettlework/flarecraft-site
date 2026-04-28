@@ -81,11 +81,12 @@ function renderHtml(p: DigestPayload, siteUrl: string): string {
 		const urlByTitle = new Map<string, string>();
 		for (const it of p.items) urlByTitle.set(it.title.trim(), it.url);
 
-		const renderCol = (
+		const renderSection = (
 			heading: string,
 			items: { title: string; line: string }[],
 			marker: string,
 			markerColor: string,
+			isFirst: boolean,
 		) => {
 			if (items.length === 0) return "";
 			const lis = items
@@ -94,26 +95,26 @@ function renderHtml(p: DigestPayload, siteUrl: string): string {
 					const titleHtml = url
 						? `<a href="${escape(url)}" style="color:#1d1d1b;text-decoration:none;border-bottom:1px solid #d4cfc3;font-weight:600;">${escape(it.title)}.</a>`
 						: `<strong style="color:#1d1d1b;font-weight:600;">${escape(it.title)}.</strong>`;
-					return `<li style="margin-bottom:8px;">${titleHtml} ${escape(it.line)}</li>`;
+					return `<li style="margin-bottom:10px;">${titleHtml} ${escape(it.line)}</li>`;
 				})
 				.join("");
-			return `<td style="vertical-align:top;width:50%;padding-right:12px;">
-				<div style="font-family:Fraunces,Georgia,serif;font-weight:600;font-size:15px;color:#1d1d1b;margin-bottom:10px;">
+			return `<div style="${isFirst ? "" : "margin-top:20px;"}">
+				<div style="font-family:Fraunces,Georgia,serif;font-weight:600;font-size:16px;color:#1d1d1b;margin-bottom:10px;">
 					<span style="font-family:'JetBrains Mono',monospace;color:${markerColor};">${marker}</span>${escape(heading)}
 				</div>
-				<ol style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.55;color:#3a3a36;">${lis}</ol>
-			</td>`;
+				<ol style="margin:0;padding-left:20px;font-size:14.5px;line-height:1.55;color:#3a3a36;">${lis}</ol>
+			</div>`;
 		};
 
+		// Single column always — two-column tables collapse poorly in Gmail
+		// mobile and most email clients won't honor media queries reliably.
 		return `
-<div style="margin:24px 0 32px;padding:24px;background:#f3efe8;border-left:3px solid #e35a14;border-radius:0 4px 4px 0;">
+<div style="margin:24px 0 32px;padding:20px 22px;background:#f3efe8;border-left:3px solid #e35a14;border-radius:0 4px 4px 0;">
 	<div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#e35a14;font-weight:600;margin-bottom:14px;">
 		The cut · today's read
 	</div>
-	<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-		${renderCol("What's working", positives, "+ ", "#e35a14")}
-		${renderCol("What's friction", negatives, "− ", "#6b675e")}
-	</tr></table>
+	${renderSection("What's working", positives, "+ ", "#e35a14", true)}
+	${renderSection("What's friction", negatives, "− ", "#6b675e", false)}
 </div>`;
 	})();
 
