@@ -1,0 +1,215 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" role="img" aria-labelledby="arch-title arch-desc" preserveAspectRatio="xMidYMid meet">
+	<title id="arch-title">FlareCraft architecture diagram</title>
+	<desc id="arch-desc">Two Cloudflare Workers — flarecraft-pipeline (cron + AI + persist) and flarecraft-site (SSR) — share data via D1, Vectorize, and R2. External services Beehiiv and Resend handle audience capture and email delivery.</desc>
+
+	<style>
+		.t-eyebrow { font: 600 12px 'JetBrains Mono', ui-monospace, monospace; fill: #e35a14; letter-spacing: 0.2em; text-transform: uppercase; }
+		.t-title { font: 700 36px 'Fraunces', Georgia, serif; fill: #1d1d1b; letter-spacing: -0.01em; }
+		.t-title-italic { font-style: italic; fill: #e35a14; }
+		.t-caption { font-style: italic; font: italic 16px 'Fraunces', Georgia, serif; fill: #6b675e; }
+		.t-card-h { font: 600 16px 'Fraunces', Georgia, serif; fill: #1d1d1b; }
+		.t-card-h-light { fill: #faf8f5; }
+		.t-meta { font: 500 11px 'JetBrains Mono', ui-monospace, monospace; fill: #6b675e; letter-spacing: 0.04em; }
+		.t-meta-uc { font: 500 10px 'JetBrains Mono', ui-monospace, monospace; fill: #6b675e; letter-spacing: 0.18em; text-transform: uppercase; }
+		.t-meta-ember { fill: #e35a14; }
+		.t-step { font: 500 13px 'Inter Tight', system-ui, sans-serif; fill: #1d1d1b; }
+		.t-step-detail { font: 400 11px 'Inter Tight', system-ui, sans-serif; fill: #6b675e; }
+		.t-primitive { font: italic 12px 'Fraunces', Georgia, serif; font-variant: small-caps; fill: #b03a0d; letter-spacing: 0.04em; }
+		.t-output { font: 500 13px 'Inter Tight', system-ui, sans-serif; fill: #1d1d1b; }
+		.t-num { font: 600 9px 'JetBrains Mono', ui-monospace, monospace; fill: #b03a0d; }
+		.t-source-meta { font: 400 11px 'Inter Tight', system-ui, sans-serif; fill: #6b675e; }
+
+		.box { fill: #faf8f5; stroke: #e6e1d8; stroke-width: 1; }
+		.box-recess { fill: #f3efe8; stroke: #d4cfc3; stroke-width: 1; }
+		.box-worker { fill: #f3efe8; stroke: #d4cfc3; stroke-width: 1.5; }
+		.pill { fill: #faf8f5; stroke: #d4cfc3; stroke-width: 1; }
+		.pill-cron { fill: #fde9d2; stroke: #e35a14; stroke-width: 1; }
+		.pill-sleep { fill: #faf8f5; stroke: #d4cfc3; stroke-width: 1; stroke-dasharray: 3 3; }
+		.badge { fill: #fde9d2; stroke: none; }
+		.arrow { stroke: #6b675e; stroke-width: 1.2; fill: none; }
+		.arrow-dotted { stroke: #6b675e; stroke-width: 1.2; fill: none; stroke-dasharray: 3 3; }
+		.ember-bar { fill: #e35a14; }
+		.rule { stroke: #e6e1d8; stroke-width: 1; }
+	</style>
+
+	<defs>
+		<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+			<path d="M 0 0 L 10 5 L 0 10 z" fill="#6b675e" />
+		</marker>
+	</defs>
+
+	<!-- TITLE BLOCK -->
+	<text x="64" y="60" class="t-eyebrow">Architecture</text>
+	<text x="64" y="106" class="t-title">How <tspan class="t-title-italic">FlareCraft</tspan> is built</text>
+	<text x="64" y="132" class="t-caption">The system reporting on the Cloudflare developer platform is built on it.</text>
+	<line x1="64" y1="156" x2="1136" y2="156" class="rule" />
+
+	<!-- SOURCES (left column) -->
+	<text x="64" y="194" class="t-meta-uc">Sources</text>
+
+	<g><!-- Hacker News -->
+		<rect x="64" y="208" width="200" height="76" rx="3" class="box" />
+		<text x="80" y="234" class="t-card-h">Hacker News</text>
+		<text x="80" y="256" class="t-source-meta">Algolia search · 24h window</text>
+		<text x="80" y="272" class="t-source-meta">stories + comments</text>
+	</g>
+
+	<g><!-- Reddit -->
+		<rect x="64" y="304" width="200" height="108" rx="3" class="box" />
+		<text x="80" y="330" class="t-card-h">Reddit</text>
+		<text x="80" y="350" class="t-source-meta">5 subreddits, public JSON API</text>
+		<text x="80" y="370" class="t-primitive">r/CloudFlare · r/cloudflaredev</text>
+		<text x="80" y="388" class="t-primitive">r/aws · r/vercel</text>
+		<text x="80" y="404" class="t-primitive">r/selfhosted</text>
+	</g>
+
+	<!-- Sources → Pipeline arrows -->
+	<path d="M 264 246 L 318 246" class="arrow" marker-end="url(#arr)" />
+	<path d="M 264 358 L 318 358" class="arrow" marker-end="url(#arr)" />
+
+	<!-- PIPELINE WORKER (center) -->
+	<g>
+		<rect x="320" y="178" width="480" height="334" rx="6" class="box-worker" />
+
+		<!-- F mark + worker name -->
+		<g transform="translate(340,196) scale(0.45)">
+			<path d="M 16 10 H 50 V 20 H 26 V 30 H 46 V 38 H 26 V 54 H 16 Z" fill="#1d1d1b"/>
+			<rect x="26" y="28" width="22" height="6" fill="#e35a14"/>
+		</g>
+		<text x="378" y="216" class="t-card-h">flarecraft-pipeline</text>
+		<text x="378" y="232" class="t-meta-uc">Worker · Workflow</text>
+
+		<!-- Worker primitive badge #1 -->
+		<circle cx="780" cy="200" r="11" class="badge" />
+		<text x="780" y="204" class="t-num" text-anchor="middle">1</text>
+
+		<!-- Workflows badge #2 -->
+		<circle cx="780" cy="226" r="11" class="badge" />
+		<text x="780" y="230" class="t-num" text-anchor="middle">2</text>
+
+		<!-- Cron Trigger -->
+		<rect x="340" y="252" width="440" height="36" rx="3" class="pill-cron" />
+		<circle cx="358" cy="270" r="4" fill="#e35a14" />
+		<text x="372" y="274" class="t-step"><tspan font-weight="600">Cron Trigger</tspan> &#8226; <tspan font-family="'JetBrains Mono', monospace" font-size="11" fill="#6b675e">0 13 * * * UTC</tspan> &#8226; daily 08:00 CDT</text>
+		<circle cx="765" cy="270" r="11" class="badge" />
+		<text x="765" y="274" class="t-num" text-anchor="middle">3</text>
+
+		<!-- step.do fetch-sources -->
+		<rect x="340" y="296" width="440" height="32" rx="3" class="pill" />
+		<text x="356" y="316" class="t-step"><tspan font-family="'JetBrains Mono', monospace" font-size="11" fill="#6b675e">step.do</tspan>  fetch-sources <tspan class="t-step-detail">— HN + Reddit, parallel</tspan></text>
+
+		<!-- step.do classify-and-persist (taller, with sub-bullets) -->
+		<rect x="340" y="334" width="440" height="68" rx="3" class="pill" />
+		<text x="356" y="354" class="t-step"><tspan font-family="'JetBrains Mono', monospace" font-size="11" fill="#6b675e">step.do</tspan>  classify-and-persist</text>
+		<text x="368" y="372" class="t-step-detail">↳ Workers AI · Llama 3.3 70B · structured JSON</text>
+		<text x="368" y="388" class="t-step-detail">↳ Workers AI · BGE embeddings · Vectorize dedup ≥ .92</text>
+		<circle cx="765" cy="368" r="11" class="badge" />
+		<text x="765" y="372" class="t-num" text-anchor="middle">4</text>
+
+		<!-- step.do generate-summary -->
+		<rect x="340" y="408" width="440" height="32" rx="3" class="pill" />
+		<text x="356" y="428" class="t-step"><tspan font-family="'JetBrains Mono', monospace" font-size="11" fill="#6b675e">step.do</tspan>  generate-summary <tspan class="t-step-detail">— top 3 + / top 3 −</tspan></text>
+
+		<!-- step.do finalize-briefing -->
+		<rect x="340" y="446" width="440" height="32" rx="3" class="pill" />
+		<text x="356" y="466" class="t-step"><tspan font-family="'JetBrains Mono', monospace" font-size="11" fill="#6b675e">step.do</tspan>  finalize-briefing</text>
+
+		<!-- step.sleep + send-digest, side by side -->
+		<rect x="340" y="484" width="160" height="22" rx="3" class="pill-sleep" />
+		<text x="354" y="500" class="t-step-detail"><tspan font-family="'JetBrains Mono', monospace">step.sleep</tspan> 5s</text>
+
+		<rect x="510" y="478" width="270" height="32" rx="3" class="pill" />
+		<text x="526" y="498" class="t-step"><tspan font-family="'JetBrains Mono', monospace" font-size="11" fill="#6b675e">step.do</tspan>  send-digest</text>
+	</g>
+
+	<!-- Pipeline → Storage arrows (down) -->
+	<path d="M 410 512 L 410 562" class="arrow" marker-end="url(#arr)" />
+	<path d="M 560 512 L 560 562" class="arrow" marker-end="url(#arr)" />
+	<path d="M 710 512 L 710 562" class="arrow" marker-end="url(#arr)" />
+
+	<!-- STORAGE row -->
+	<text x="320" y="552" class="t-meta-uc">Shared substrate</text>
+
+	<g><!-- D1 -->
+		<rect x="320" y="566" width="148" height="76" rx="3" class="box-recess" />
+		<text x="338" y="592" class="t-card-h">D1</text>
+		<text x="338" y="612" class="t-source-meta">briefings + items</text>
+		<text x="338" y="626" class="t-source-meta">SQLite at the edge</text>
+		<circle cx="450" cy="582" r="11" class="badge" />
+		<text x="450" y="586" class="t-num" text-anchor="middle">5</text>
+	</g>
+
+	<g><!-- Vectorize -->
+		<rect x="486" y="566" width="148" height="76" rx="3" class="box-recess" />
+		<text x="504" y="592" class="t-card-h">Vectorize</text>
+		<text x="504" y="612" class="t-source-meta">768-d embeddings</text>
+		<text x="504" y="626" class="t-source-meta">cosine similarity</text>
+		<circle cx="616" cy="582" r="11" class="badge" />
+		<text x="616" y="586" class="t-num" text-anchor="middle">6</text>
+	</g>
+
+	<g><!-- R2 -->
+		<rect x="652" y="566" width="148" height="76" rx="3" class="box-recess" />
+		<text x="670" y="592" class="t-card-h">R2</text>
+		<text x="670" y="612" class="t-source-meta">raw post archive</text>
+		<text x="670" y="626" class="t-source-meta">egress-free</text>
+		<circle cx="782" cy="582" r="11" class="badge" />
+		<text x="782" y="586" class="t-num" text-anchor="middle">7</text>
+	</g>
+
+	<!-- D1 → Site Worker arrow (up-right) -->
+	<path d="M 468 596 L 836 252" class="arrow" marker-end="url(#arr)" />
+	<text x="660" y="412" class="t-source-meta" font-style="italic">reads in SSR request path</text>
+
+	<!-- Pipeline → Resend arrow (right from send-digest) -->
+	<path d="M 800 494 L 856 494" class="arrow" marker-end="url(#arr)" />
+
+	<!-- SITE WORKER (right column top) -->
+	<g>
+		<rect x="836" y="178" width="300" height="156" rx="6" class="box-worker" />
+
+		<g transform="translate(854,196) scale(0.45)">
+			<path d="M 16 10 H 50 V 20 H 26 V 30 H 46 V 38 H 26 V 54 H 16 Z" fill="#1d1d1b"/>
+			<rect x="26" y="28" width="22" height="6" fill="#e35a14"/>
+		</g>
+		<text x="892" y="216" class="t-card-h">flarecraft-site</text>
+		<text x="892" y="232" class="t-meta-uc">Worker · Astro SSR</text>
+
+		<line x1="852" y1="252" x2="1120" y2="252" class="rule" />
+
+		<text x="852" y="276" class="t-step">Renders <tspan class="t-primitive">/</tspan>, <tspan class="t-primitive">/about/</tspan>, <tspan class="t-primitive">/archive/</tspan>,</text>
+		<text x="852" y="294" class="t-step"><tspan class="t-primitive">/briefing/[id]</tspan> server-side from D1.</text>
+		<text x="852" y="316" class="t-source-meta">No rebuild on data update.</text>
+
+		<!-- Pages / Assets badge #8 -->
+		<circle cx="1116" cy="200" r="11" class="badge" />
+		<text x="1116" y="204" class="t-num" text-anchor="middle">8</text>
+
+		<!-- → flarecraft.dev label outside -->
+	</g>
+	<text x="836" y="356" class="t-output">→ flarecraft.dev</text>
+
+	<!-- RESEND -->
+	<g>
+		<rect x="836" y="478" width="300" height="56" rx="3" class="box" />
+		<text x="852" y="500" class="t-card-h">Resend</text>
+		<text x="852" y="520" class="t-source-meta">daily digest from notes@flarecraft.dev</text>
+	</g>
+	<text x="836" y="554" class="t-output">→ Inbox</text>
+
+	<!-- BEEHIIV -->
+	<g>
+		<rect x="836" y="586" width="300" height="56" rx="3" class="box" />
+		<text x="852" y="608" class="t-card-h">Beehiiv</text>
+		<text x="852" y="628" class="t-source-meta">public subscribe · audience capture</text>
+	</g>
+
+	<!-- Beehiiv → Site Worker (dotted, subscribe form embed) -->
+	<path d="M 986 586 Q 986 412 986 336" class="arrow-dotted" marker-end="url(#arr)" />
+	<text x="996" y="486" class="t-source-meta" font-style="italic">subscribe</text>
+
+	<!-- BOTTOM CAPTION -->
+	<line x1="64" y1="690" x2="1136" y2="690" class="rule" />
+	<text x="600" y="722" class="t-caption" text-anchor="middle">Eight Cloudflare primitives. Two Workers. One product.</text>
+	<rect x="0" y="754" width="1200" height="6" class="ember-bar" />
+</svg>

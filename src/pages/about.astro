@@ -28,6 +28,16 @@ const siteUrl = env.SITE_URL ?? "https://flarecraft.dev";
 			</p>
 
 			<h2 class="serif">Architecture</h2>
+
+			<figure class="arch-figure">
+				<img
+					src="/brand/architecture.svg"
+					alt="FlareCraft architecture diagram. Two Cloudflare Workers — flarecraft-pipeline and flarecraft-site — share data via D1, Vectorize, and R2. The pipeline runs on a daily Cron Trigger, fetches from Hacker News and five Reddit subs, classifies and embeds via Workers AI, dedupes via Vectorize, and persists to D1 and R2. The site Worker reads from D1 in the SSR request path. Beehiiv handles public subscribe and Resend handles email delivery."
+					loading="lazy"
+				/>
+				<figcaption><em>Eight Cloudflare primitives. Two Workers. One product.</em></figcaption>
+			</figure>
+
 			<p>Two Workers in one repo, sharing eight Cloudflare primitives plus two external services:</p>
 
 			<dl class="primitives-list">
@@ -211,5 +221,23 @@ const siteUrl = env.SITE_URL ?? "https://flarecraft.dev";
 	.prose-meta a {
 		color: var(--orange-deep);
 		text-decoration: none;
+	}
+	.arch-figure {
+		margin: 24px 0 32px;
+		padding: 0;
+	}
+	.arch-figure img {
+		display: block;
+		width: 100%;
+		height: auto;
+		border: 1px solid var(--rule);
+		border-radius: 4px;
+		background: var(--paper);
+	}
+	.arch-figure figcaption {
+		margin-top: 12px;
+		font-size: 14px;
+		color: var(--ink-3);
+		text-align: center;
 	}
 </style>
