@@ -1,0 +1,168 @@
+---
+import Layout from "../components/Layout.astro";
+---
+
+<Layout
+	title="About FlareCraft"
+	description="How FlareCraft is built — the architecture, the primitive choices, and the things I deliberately didn't do."
+>
+	<header class="hero">
+		<p class="eyebrow">About</p>
+		<h1>The system reporting<br />on the platform.</h1>
+		<p class="lede">
+			FlareCraft is a working artifact built end-to-end on Cloudflare to demonstrate platform fluency, taste, and shipping discipline. This page is the architecture reference and the honest write-up of choices made.
+		</p>
+	</header>
+
+	<section class="prose">
+		<h2>The thesis</h2>
+		<p>
+			A daily briefing of what developers are shipping on a platform is exactly the kind of work a developer adoption function does. So FlareCraft does that work — using the platform itself. The act of building this is the demonstration; the artifact persists as a useful tool. <strong>The system reporting on the platform is the platform.</strong>
+		</p>
+
+		<h2>Architecture</h2>
+		<p>
+			Two Workers in one repo, sharing eight Cloudflare primitives plus one external service:
+		</p>
+
+		<dl class="primitives">
+			<div>
+				<dt>Workers</dt>
+				<dd>Two of them: <code>flarecraft-pipeline</code> (cron + AI + writes) and <code>flarecraft-site</code> (this SSR site, reads). Same runtime, different roles. One Worker per concern is the cleaner production pattern.</dd>
+			</div>
+			<div>
+				<dt>Workflows</dt>
+				<dd>The pipeline is a <code>WorkflowEntrypoint</code>. Each step (<em>fetch → classify+persist → finalize → notify</em>) is a checkpointed <code>step.do</code> with its own retry policy. A Worker crash mid-run resumes at the last completed step; transient classification errors retry with exponential backoff. No external orchestration service — durable execution is a primitive of the platform.</dd>
+			</div>
+			<div>
+				<dt>Cron Triggers</dt>
+				<dd>One line in <code>wrangler.jsonc</code> (<code>"crons": ["0 13 * * *"]</code>) registers the daily 08:00 CDT run. The cron handler instantiates a Workflow and returns; the Workflow runs durably in its own context.</dd>
+			</div>
+			<div>
+				<dt>Workers AI — Llama 3.3 70B</dt>
+				<dd>Classifies each Hacker News post with structured JSON output (<code>response_format: json_schema</code>). The schema enforces the exact shape downstream storage expects — no parsing brittleness. Quality matters more than latency for a daily-cron workload, so 70B over 8B.</dd>
+			</div>
+			<div>
+				<dt>Workers AI — BGE Base (768d)</dt>
+				<dd>Generates embeddings of <code>title + one-liner</code> for semantic dedup. Different model class, same inference platform, same binding.</dd>
+			</div>
+			<div>
+				<dt>Vectorize</dt>
+				<dd>Holds the embedding corpus. Each new item queries <code>topK: 1</code>; if cosine similarity exceeds 0.92 against any existing vector, it's treated as a duplicate and skipped. This catches the case where the same launch gets posted multiple times across HN threads — hash-on-URL would let those through; semantic dedup catches them.</dd>
+			</div>
+			<div>
+				<dt>D1</dt>
+				<dd>Two tables: <code>briefings</code> (one row per pipeline run) and <code>items</code> (classified posts). The pipeline Worker writes; this site Worker reads in the SSR request path. Same database, two Workers, different bindings — capability-based separation.</dd>
+			</div>
+			<div>
+				<dt>R2</dt>
+				<dd>Archives raw normalized post JSON keyed by <code>date/source/id</code>. Egress-free storage means the entire corpus can be re-classified later when the prompt or model improves, without re-fetching from HN. <em>(Note: R2 is gated behind an account-level toggle; the binding is wired but R2 was being enabled at write-time.)</em></dd>
+			</div>
+			<div>
+				<dt>Pages / Static Assets</dt>
+				<dd>This site is server-rendered on a Worker via <code>@astrojs/cloudflare</code>, so dynamic data from D1 lands in the request path with no rebuild needed. Static assets (favicon, fonts) are served by the same Worker via the <code>ASSETS</code> binding. Static and dynamic in one project, one runtime.</dd>
+			</div>
+			<div>
+				<dt>Resend (external)</dt>
+				<dd>Email delivery. Cloudflare's MailChannels arrangement for free outbound email ended in mid-2024, so transactional email from Workers now uses a third party. Resend's API is a single POST; no SDK weight added to the bundle.</dd>
+			</div>
+		</dl>
+
+		<h2>Choices I deliberately didn't make</h2>
+		<ul>
+			<li>
+				<strong>Cloudflare Agents SDK.</strong> Considered and rejected. Agents SDK is shaped for stateful chat/tool-use agents on top of Durable Objects. FlareCraft is a stateless scheduled pipeline — Workflows is the correct abstraction. Picking the wrong primitive because it's trendy is anti-signal.
+			</li>
+			<li>
+				<strong>Hash-on-URL deduplication.</strong> Cheaper, but lets near-duplicates through. Vectorize embedding similarity catches semantic redundancy (same launch posted in three different threads), which is the real shape of the dedup problem in this corpus.
+			</li>
+			<li>
+				<strong>Per-post Workflow steps.</strong> Tempting (clean checkpoints!), but each step is a state-machine transition with metadata overhead. For batch processing, the Cloudflare-recommended pattern is to do the inner loop inside one <code>step.do</code> and let the outer steps mark phases.
+			</li>
+			<li>
+				<strong>Reddit and dev.to ingestion.</strong> Scoped out of v1 to ship clean. Adding sources is a single function in <code>pipeline/src/lib/</code>, returning <code>SourcePost[]</code>. The schema is source-agnostic.
+			</li>
+			<li>
+				<strong>Browser Rendering for richer content.</strong> Most HN posts that matter are link posts; the title plus a fetched excerpt is enough signal for classification. Browser Rendering would add latency and cost without obvious recall gains at this scale.
+			</li>
+		</ul>
+
+		<h2>Honest tradeoffs</h2>
+		<ul>
+			<li>The classification prompt is one shot. A reflection / verifier pass would catch more false positives but doubles inference cost. Worth adding if score-3 items are noisy after a week of runs.</li>
+			<li>The 0.92 similarity threshold is empirical, not validated. Items per day will tell us if it's tight enough.</li>
+			<li>The <code>@astrojs/cloudflare</code> adapter does not natively host a Workflow class export, which is why FlareCraft is two Workers instead of one. Consolidation is on the platform's roadmap; for now, the cleaner pattern is honest separation.</li>
+		</ul>
+
+		<h2>The candidate, briefly</h2>
+		<p>
+			Built by Andrew Holmes as a working artifact for a VP of Developer Adoption interview process at Cloudflare. The repo is at <a href="https://github.com/mettlework/flarecraft-site" target="_blank" rel="noopener">github.com/mettlework/flarecraft-site</a>.
+		</p>
+	</section>
+</Layout>
+
+<style>
+	.prose {
+		max-width: 720px;
+	}
+	.prose h2 {
+		font-family: var(--font-serif);
+		font-size: 28px;
+		font-weight: 700;
+		letter-spacing: -0.015em;
+		margin: 56px 0 16px;
+	}
+	.prose p,
+	.prose li {
+		font-size: 17px;
+		line-height: 1.65;
+		color: var(--fg-soft);
+	}
+	.prose code {
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 0.92em;
+		background: var(--bg-soft);
+		padding: 1px 6px;
+		border-radius: 3px;
+		color: var(--fg);
+	}
+	.prose ul {
+		margin: 16px 0;
+		padding-left: 24px;
+	}
+	.prose ul li {
+		margin-bottom: 12px;
+	}
+	.prose strong {
+		color: var(--fg);
+		font-weight: 600;
+	}
+	.primitives {
+		margin: 24px 0;
+		padding: 0;
+	}
+	.primitives div {
+		padding: 16px 0;
+		border-top: 1px solid var(--border);
+		margin: 0;
+	}
+	.primitives div:last-child {
+		border-bottom: 1px solid var(--border);
+	}
+	.primitives dt {
+		font-family: var(--font-serif);
+		font-weight: 600;
+		font-size: 17px;
+		color: var(--fg);
+		margin: 0 0 6px;
+	}
+	.primitives dd {
+		font-size: 15px;
+		color: var(--fg-soft);
+		margin: 0;
+		line-height: 1.6;
+	}
+	.primitives dd code {
+		font-size: 0.88em;
+	}
+</style>

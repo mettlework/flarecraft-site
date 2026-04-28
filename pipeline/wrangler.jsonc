@@ -1,0 +1,56 @@
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "flarecraft-pipeline",
+	"main": "src/worker.ts",
+	"compatibility_date": "2026-04-28",
+	"compatibility_flags": ["nodejs_compat"],
+
+	"observability": { "enabled": true },
+
+	"ai": {
+		"binding": "AI"
+	},
+
+	"vectorize": [
+		{
+			"binding": "VECTORIZE",
+			"index_name": "flarecraft-index"
+		}
+	],
+
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "flarecraft",
+			"database_id": "6d0c5657-725f-49f2-859f-715e5505498b"
+		}
+	],
+
+	// R2 binding temporarily commented until account R2 is enabled.
+	// Re-add and redeploy once enabled in dashboard. The pipeline tolerates
+	// a missing ARCHIVE binding (archive step is best-effort, try/catch'd).
+	// "r2_buckets": [
+	// 	{
+	// 		"binding": "ARCHIVE",
+	// 		"bucket_name": "flarecraft-archive"
+	// 	}
+	// ],
+
+	"workflows": [
+		{
+			"name": "flarecraft-pipeline",
+			"binding": "PIPELINE",
+			"class_name": "FlareCraftPipeline"
+		}
+	],
+
+	"triggers": {
+		"crons": ["0 13 * * *"]
+	},
+
+	"vars": {
+		"DIGEST_RECIPIENT": "andrew@mettlework.io",
+		"DIGEST_SENDER": "FlareCraft <notes@flarecraft.dev>",
+		"SITE_URL": "https://flarecraft.dev"
+	}
+}

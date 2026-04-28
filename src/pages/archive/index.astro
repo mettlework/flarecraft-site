@@ -1,0 +1,91 @@
+---
+import { env } from "cloudflare:workers";
+import Layout from "../../components/Layout.astro";
+import { getRecentBriefings } from "../../lib/db";
+
+const briefings = env.DB ? await getRecentBriefings(env.DB, 30) : [];
+---
+
+<Layout
+	title="Archive — FlareCraft"
+	description="Past daily briefings of Cloudflare developer activity."
+>
+	<header class="hero">
+		<p class="eyebrow">Archive</p>
+		<h1>Past briefings</h1>
+		<p class="lede">
+			Every daily run is preserved. Click any date to see what made the cut.
+		</p>
+	</header>
+
+	<section class="archive">
+		{
+			briefings.length === 0 && (
+				<p class="empty">No completed briefings yet.</p>
+			)
+		}
+		{
+			briefings.map((b) => {
+				const date = new Date(b.run_started_at).toLocaleDateString("en-US", {
+					weekday: "long",
+					month: "long",
+					day: "numeric",
+					year: "numeric",
+				});
+				return (
+					<a class="row" href={`/briefing/${b.id}/`}>
+						<div class="row-date">{date}</div>
+						<div class="row-stats">
+							<span><strong>{b.kept_count}</strong> items</span>
+							<span class="muted">/</span>
+							<span class="muted">{b.classified_count} classified</span>
+							<span class="muted">/</span>
+							<span class="muted">{b.source_count} sourced</span>
+						</div>
+					</a>
+				);
+			})
+		}
+	</section>
+</Layout>
+
+<style>
+	.empty {
+		color: var(--muted);
+		padding: 32px 0;
+	}
+	.archive {
+		border-top: 1px solid var(--border);
+	}
+	.row {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		padding: 20px 0;
+		border-bottom: 1px solid var(--border);
+		text-decoration: none;
+		color: var(--fg);
+		gap: 24px;
+		flex-wrap: wrap;
+	}
+	.row:hover {
+		color: var(--accent);
+	}
+	.row-date {
+		font-family: var(--font-serif);
+		font-size: 18px;
+		font-weight: 600;
+	}
+	.row-stats {
+		font-size: 14px;
+		color: var(--fg-soft);
+		display: flex;
+		gap: 8px;
+	}
+	.row-stats strong {
+		color: var(--fg);
+	}
+	.muted {
+		color: var(--muted);
+	}
+</style>

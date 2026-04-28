@@ -1,0 +1,79 @@
+---
+import { env } from "cloudflare:workers";
+import Layout from "../../components/Layout.astro";
+import { getBriefingById, parsePrimitives } from "../../lib/db";
+
+const { id } = Astro.params;
+const briefing = env.DB && id ? await getBriefingById(env.DB, id) : null;
+
+if (!briefing) {
+	return new Response(null, { status: 404, statusText: "Briefing not found" });
+}
+
+const dateLabel = new Date(briefing.row.run_started_at).toLocaleDateString(
+	"en-US",
+	{
+		weekday: "long",
+		month: "long",
+		day: "numeric",
+		year: "numeric",
+	},
+);
+---
+
+<Layout title={`${dateLabel} — FlareCraft`}>
+	<header class="hero">
+		<p class="eyebrow">Briefing &middot; {dateLabel}</p>
+		<h1>What developers shipped<br />on this day</h1>
+		<p class="lede">
+			{briefing.row.kept_count} items kept, {briefing.row.classified_count} classified, {briefing.row.source_count} scanned, {briefing.row.deduped_count} deduplicated.
+		</p>
+	</header>
+
+	<section class="briefing">
+		{
+			briefing.items.map((item, i) => {
+				const primitives = parsePrimitives(item.primitives);
+				return (
+					<article class={`item item--score-${item.score}`}>
+						<div class="item-meta">
+							<span class="item-num">{String(i + 1).padStart(2, "0")}</span>
+							<span class="item-score">
+								{"★".repeat(item.score)}
+								{"☆".repeat(5 - item.score)}
+							</span>
+							<span class="item-angle">{item.angle}</span>
+							<span class="item-source">via {item.source}</span>
+						</div>
+						<h2>
+							<a href={item.url} target="_blank" rel="noopener">
+								{item.title}
+							</a>
+						</h2>
+						<p class="item-summary">{item.one_liner}</p>
+						{primitives.length > 0 && (
+							<ul class="item-primitives">
+								{primitives.map((p) => (
+									<li>{p}</li>
+								))}
+							</ul>
+						)}
+					</article>
+				);
+			})
+		}
+	</section>
+
+	<p class="back"><a href="/archive/">← All briefings</a></p>
+</Layout>
+
+<style>
+	.back {
+		margin-top: 64px;
+		font-size: 14px;
+	}
+	.back a {
+		color: var(--accent);
+		text-decoration: none;
+	}
+</style>

@@ -1,8 +1,26 @@
 {
+	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "flarecraft-site",
-	"compatibility_date": "2026-04-24",
+	"compatibility_date": "2026-04-28",
+	"compatibility_flags": ["nodejs_compat"],
+
+	"observability": { "enabled": true },
+
 	"assets": {
 		"directory": "./dist",
-		"not_found_handling": "404-page"
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application"
+	},
+
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "flarecraft",
+			"database_id": "6d0c5657-725f-49f2-859f-715e5505498b"
+		}
+	],
+
+	"vars": {
+		"SITE_URL": "https://flarecraft.dev"
 	}
 }
