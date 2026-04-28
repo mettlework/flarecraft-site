@@ -128,7 +128,7 @@ The dual-platform split is deliberate: Beehiiv's programmatic publish API is gat
 
 - The classification prompt is one-shot. A reflection / verifier pass would cut false positives but doubles inference cost — worth adding if score-3 items prove noisy after a week of data.
 - The 0.92 dedup threshold is empirical, not validated against held-out data.
-- **Real DX frictions hit during the build**, included for honesty:
+- **Real DX frictions hit during the build**:
   - Wrangler v3 (installed by the official `create-cloudflare` scaffold) is past EOL — first-day DX surfaces a deprecated tool.
   - Astro v6 silently broke `Astro.locals.runtime.env` in favor of `import { env } from "cloudflare:workers"` — only visible at runtime, no build-time warning.
   - Workers AI's `response_format: json_schema` returns one of three different shapes depending on model — `{response: string}`, `{response: object}`, or the bare object. Caller has to coerce.
