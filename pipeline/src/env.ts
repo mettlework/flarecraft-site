@@ -24,8 +24,10 @@ export interface Env {
 	SITE_URL: string;
 
 	// Secrets (set via `wrangler secret put`)
-	RESEND_API_KEY: string;
 	PIPELINE_AUTH_TOKEN: string;
+	// Resend — daily digest delivery (Beehiiv handles audience capture
+	// at flare-craft.beehiiv.com; sync subscribers → Resend audience is v2).
+	RESEND_API_KEY: string;
 }
 
 // Shape of items stored in D1 — matches schema.sql

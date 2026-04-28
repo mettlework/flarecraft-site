@@ -26,15 +26,12 @@
 		}
 	],
 
-	// R2 binding temporarily commented until account R2 is enabled.
-	// Re-add and redeploy once enabled in dashboard. The pipeline tolerates
-	// a missing ARCHIVE binding (archive step is best-effort, try/catch'd).
-	// "r2_buckets": [
-	// 	{
-	// 		"binding": "ARCHIVE",
-	// 		"bucket_name": "flarecraft-archive"
-	// 	}
-	// ],
+	"r2_buckets": [
+		{
+			"binding": "ARCHIVE",
+			"bucket_name": "flarecraft-archive"
+		}
+	],
 
 	"workflows": [
 		{
@@ -50,7 +47,11 @@
 
 	"vars": {
 		"DIGEST_RECIPIENT": "andrew@mettlework.io",
-		"DIGEST_SENDER": "FlareCraft <notes@flarecraft.dev>",
+		// Resend free tier sends from onboarding@resend.dev until we verify
+		// flarecraft.dev as a sending domain (DNS records: SPF, DKIM, DMARC).
+		// Switching to "FlareCraft <notes@flarecraft.dev>" is a one-line change
+		// once those records propagate.
+		"DIGEST_SENDER": "FlareCraft <onboarding@resend.dev>",
 		"SITE_URL": "https://flarecraft.dev"
 	}
 }

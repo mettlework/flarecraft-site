@@ -1,12 +1,15 @@
-// Compose and send the daily digest email via Resend.
+// Send the daily digest as an email via Resend.
 //
-// Resend is a third-party transactional email service with a clean Workers-
-// compatible API and a generous free tier. We use raw fetch() rather than
-// the SDK for transparency and zero bundle weight.
+// We pivoted away from Beehiiv's Posts API for the actual send because
+// programmatic publish is gated to their enterprise tier. Beehiiv stays
+// in the stack as the public subscribe-form / audience layer; Resend is
+// the transport. Two platforms, separation of concerns:
+//   - Beehiiv: who's in the list (and growth tooling, archive page, etc.)
+//   - Resend:  the daily mail actually going out
 //
-// The email is intentionally minimal: top items by score, with primitive
-// tags, one-liner, and a link. The full briefing lives at flarecraft.dev/
-// — the email is a hook back to the site, not a replacement for it.
+// The bridge between them — pulling the Beehiiv subscriber list and
+// blasting the digest to it via Resend — is a v2 problem. Today the
+// digest goes to a single recipient (subscriber zero) to prove the path.
 
 import type { ClassifiedItem, Env } from "../env";
 
@@ -26,9 +29,14 @@ export async function sendDigest(
 		return;
 	}
 
+	if (!env.RESEND_API_KEY) {
+		console.warn("Digest: RESEND_API_KEY not set, skipping send");
+		return;
+	}
+
 	const subject = `FlareCraft: ${items.length} ${items.length === 1 ? "thing" : "things"} on Cloudflare today`;
-	const html = renderDigestHtml(payload, env.SITE_URL);
-	const text = renderDigestText(payload, env.SITE_URL);
+	const html = renderHtml(payload, env.SITE_URL);
+	const text = renderText(payload, env.SITE_URL);
 
 	const res = await fetch("https://api.resend.com/emails", {
 		method: "POST",
@@ -49,9 +57,12 @@ export async function sendDigest(
 		const body = await res.text();
 		throw new Error(`Resend send failed: ${res.status} ${body}`);
 	}
+
+	const result = (await res.json()) as { id?: string };
+	console.log(`Digest: Resend message id ${result.id ?? "(unknown)"}`);
 }
 
-function renderDigestHtml(p: DigestPayload, siteUrl: string): string {
+function renderHtml(p: DigestPayload, siteUrl: string): string {
 	const date = new Date().toLocaleDateString("en-US", {
 		weekday: "long",
 		month: "long",
@@ -60,56 +71,56 @@ function renderDigestHtml(p: DigestPayload, siteUrl: string): string {
 	});
 
 	const itemsHtml = p.items
-		.map((item) => {
+		.map((item, idx) => {
 			const primitives = safeJSONArray(item.primitives);
 			const tagsHtml = primitives
 				.map(
-					(p) =>
-						`<span style="display:inline-block;background:#fef1e4;color:#f6821f;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;margin-right:6px;">${escape(p)}</span>`,
+					(prim) =>
+						`<span style="display:inline-block;background:#fde9d2;color:#b03a0d;padding:2px 8px;border-radius:3px;font-size:12px;font-weight:600;margin-right:4px;font-family:'JetBrains Mono',ui-monospace,monospace;">${escape(prim)}</span>`,
 				)
 				.join("");
 
 			return `
-				<tr>
-					<td style="padding:20px 0;border-bottom:1px solid #e5e1db;">
-						<div style="font-size:13px;color:#6b6b6b;margin-bottom:6px;">
-							${"★".repeat(item.score)}${"☆".repeat(5 - item.score)} &middot; ${escape(item.angle)}
-						</div>
-						<a href="${escape(item.url)}" style="font-size:18px;font-weight:600;color:#1a1a1a;text-decoration:none;line-height:1.3;display:block;margin-bottom:8px;">
-							${escape(item.title)}
-						</a>
-						<div style="margin-bottom:10px;">${tagsHtml}</div>
-						<div style="font-size:14px;color:#4a4a4a;line-height:1.5;">${escape(item.one_liner)}</div>
-					</td>
-				</tr>`;
+<tr><td style="padding:20px 0;border-bottom:1px solid #e6e1d8;">
+	<div style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#e35a14;margin-bottom:8px;font-weight:600;">
+		${String(idx + 1).padStart(2, "0")} &nbsp;·&nbsp; ${"★".repeat(item.score)}${"☆".repeat(5 - item.score)} &nbsp;·&nbsp; ${escape(item.angle)}
+	</div>
+	<h2 style="font-family:Fraunces,Georgia,serif;font-weight:600;font-size:22px;line-height:1.25;letter-spacing:-0.015em;margin:0 0 10px;color:#1d1d1b;">
+		<a href="${escape(item.url)}" style="color:#1d1d1b;text-decoration:none;">${escape(item.title)}</a>
+	</h2>
+	${tagsHtml ? `<div style="margin-bottom:10px;">${tagsHtml}</div>` : ""}
+	<p style="margin:0;font-size:15px;color:#3a3a36;line-height:1.55;">${escape(item.one_liner)}</p>
+</td></tr>`;
 		})
 		.join("");
 
 	return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>FlareCraft</title></head>
-<body style="margin:0;padding:0;background:#faf8f5;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;">
+<body style="margin:0;padding:0;background:#faf8f5;font-family:'Inter Tight',system-ui,-apple-system,sans-serif;">
 	<table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;margin:0 auto;padding:48px 24px;">
-		<tr>
-			<td>
-				<div style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase;color:#f6821f;font-weight:600;margin-bottom:12px;">FlareCraft &middot; ${escape(date)}</div>
-				<h1 style="font-size:28px;letter-spacing:-0.02em;line-height:1.2;color:#1a1a1a;margin:0 0 8px;">What developers are shipping on Cloudflare</h1>
-				<p style="font-size:15px;color:#6b6b6b;margin:0 0 32px;">
-					${p.items.length} item${p.items.length === 1 ? "" : "s"} from Hacker News in the last 24 hours, classified and ranked by Workers AI.
-				</p>
-				<table width="100%" cellpadding="0" cellspacing="0" border="0">${itemsHtml}</table>
-				<div style="margin-top:32px;padding-top:24px;border-top:1px solid #e5e1db;font-size:13px;color:#6b6b6b;">
-					Read the full briefing at <a href="${escape(siteUrl)}" style="color:#f6821f;text-decoration:none;">flarecraft.dev</a><br>
-					Built end-to-end on Cloudflare: Workers + Workflows + Workers AI + Vectorize + D1 + R2 + Pages.
-				</div>
-			</td>
-		</tr>
+		<tr><td>
+			<div style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#e35a14;font-weight:600;margin-bottom:12px;">
+				FlareCraft &nbsp;·&nbsp; ${escape(date)}
+			</div>
+			<h1 style="font-family:Fraunces,Georgia,serif;font-size:32px;letter-spacing:-0.025em;line-height:1.1;color:#1d1d1b;margin:0 0 8px;font-weight:700;">
+				What developers are shipping<br>on Cloudflare
+			</h1>
+			<p style="font-size:15px;color:#3a3a36;margin:0 0 32px;">
+				${p.items.length} item${p.items.length === 1 ? "" : "s"} from Hacker News in the last 24 hours, classified and ranked by Workers AI.
+			</p>
+			<table width="100%" cellpadding="0" cellspacing="0" border="0">${itemsHtml}</table>
+			<div style="margin-top:32px;padding-top:24px;border-top:2px solid #e35a14;font-size:13px;color:#6b675e;">
+				Read live at <a href="${escape(siteUrl)}" style="color:#e35a14;text-decoration:none;font-weight:600;">flarecraft.dev</a><br>
+				Built end-to-end on Cloudflare: Workers + Workflows + Workers AI + Vectorize + D1 + R2.
+			</div>
+		</td></tr>
 	</table>
 </body>
 </html>`;
 }
 
-function renderDigestText(p: DigestPayload, siteUrl: string): string {
+function renderText(p: DigestPayload, siteUrl: string): string {
 	const date = new Date().toLocaleDateString("en-US", {
 		weekday: "long",
 		month: "long",

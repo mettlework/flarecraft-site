@@ -176,6 +176,13 @@ export class FlareCraftPipeline extends WorkflowEntrypoint<
 
 		// 5. Send the email digest with the top items.
 		if (!skipEmail) {
+			// Hibernate briefly so the digest step gets a fresh Worker invocation
+			// with a clean subrequest budget — the classify step above can use
+			// 100+ subrequests on a busy day, which on Workers Free (50/invocation)
+			// would otherwise leave nothing for the digest call. step.sleep is
+			// the Workflows-native way to force an invocation boundary.
+			await step.sleep("checkpoint-before-digest", "5 seconds");
+
 			await step.do(
 				"send-digest",
 				{ retries: { limit: 3, delay: "30 seconds" } },

@@ -1,22 +1,44 @@
 ---
 import { env } from "cloudflare:workers";
-import { getLatestBriefing, parsePrimitives } from "../lib/db";
 import Layout from "../components/Layout.astro";
+import {
+	getLatestBriefing,
+	getCorpusStats,
+	getTopPrimitives,
+	parsePrimitives,
+} from "../lib/db";
 
 const briefing = env.DB ? await getLatestBriefing(env.DB) : null;
+const stats = env.DB
+	? await getCorpusStats(env.DB)
+	: { briefingCount: 0, itemsKept: 0, sourcesScanned: 0, lastRunAt: null };
+const topPrimitives = env.DB ? await getTopPrimitives(env.DB, 6) : [];
 
-// Aggregate primitives across the briefing for the hero callout
-const primitiveCounts = new Map<string, number>();
-for (const item of briefing?.items ?? []) {
-	for (const p of parsePrimitives(item.primitives)) {
-		primitiveCounts.set(p, (primitiveCounts.get(p) ?? 0) + 1);
+// Compute time until next 13:00 UTC cron run.
+function nextRunInfo(): { absolute: string; relative: string } {
+	const now = new Date();
+	const next = new Date(now);
+	next.setUTCHours(13, 0, 0, 0);
+	if (next.getTime() <= now.getTime()) {
+		next.setUTCDate(next.getUTCDate() + 1);
 	}
+	const diffMs = next.getTime() - now.getTime();
+	const hours = Math.floor(diffMs / (1000 * 60 * 60));
+	const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+	const relative =
+		hours >= 1
+			? `in ${hours}h ${minutes}m`
+			: `in ${minutes}m`;
+	const absolute = next.toLocaleString("en-US", {
+		hour: "numeric",
+		minute: "2-digit",
+		timeZone: "America/Chicago",
+		hour12: true,
+	});
+	return { absolute: `${absolute} CT`, relative };
 }
-const topPrimitives = [...primitiveCounts.entries()]
-	.sort((a, b) => b[1] - a[1])
-	.slice(0, 6)
-	.map(([name, count]) => ({ name, count }));
 
+const nextRun = nextRunInfo();
 const dateLabel = briefing
 	? new Date(briefing.row.run_started_at).toLocaleDateString("en-US", {
 			weekday: "long",
@@ -30,119 +52,434 @@ const dateLabel = briefing
 			day: "numeric",
 			year: "numeric",
 		});
+
+const lastRunRelative = (() => {
+	if (!stats.lastRunAt) return "never";
+	const diffMs = Date.now() - stats.lastRunAt;
+	const hours = Math.floor(diffMs / (1000 * 60 * 60));
+	if (hours < 1) {
+		const mins = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+		return `${mins}m ago`;
+	}
+	if (hours < 48) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	return `${days}d ago`;
+})();
 ---
 
 <Layout
 	title="FlareCraft — what developers are shipping on Cloudflare"
-	description="A daily AI-curated briefing of what developers are building, launching, and critiquing on the Cloudflare developer platform."
+	description="A daily AI-curated briefing of what developers are building, launching, and critiquing on the Cloudflare developer platform. Built end-to-end on the platform itself."
 >
-	<header class="hero">
-		<p class="eyebrow">FlareCraft &middot; {dateLabel}</p>
-		<h1>What developers are shipping<br />on Cloudflare</h1>
-		<p class="lede">
-			A daily briefing of posts, launches, and critiques from the open web,
-			classified and ranked by Workers AI. Built end-to-end on the Cloudflare
-			developer platform — the system reporting on the platform.
-		</p>
+	<div class="editorial">
+		<main class="editorial-main">
+			<header class="hero">
+				<span class="eyebrow">FlareCraft &nbsp;·&nbsp; {dateLabel}</span>
+				<h1 class="serif">
+					What developers are shipping<br />on <i>Cloudflare</i>
+				</h1>
+				<p class="lede">
+					A daily briefing of posts, launches, and critiques from the open web,
+					classified and ranked by Workers AI. Built end-to-end on the
+					Cloudflare developer platform — the system reporting on the platform.
+				</p>
+			</header>
 
-		{
-			briefing && (
-				<dl class="stats">
+			<section class="briefing">
+				{!briefing && (
+					<div class="empty">
+						<p>The first briefing hasn't run yet.</p>
+					</div>
+				)}
+
+				{briefing && briefing.items.length === 0 && (
+					<div class="empty">
+						<p>The pipeline ran but didn't surface anything noteworthy in the last window. Check back tomorrow.</p>
+					</div>
+				)}
+
+				{briefing &&
+					briefing.items.map((item, i) => {
+						const primitives = parsePrimitives(item.primitives);
+						return (
+							<article class={`item item--score-${item.score}`}>
+								<aside class="item-num serif">{String(i + 1).padStart(2, "0")}</aside>
+								<div class="item-body">
+									<div class="item-meta">
+										<span class="eyebrow">
+											{"★".repeat(item.score)}{"☆".repeat(5 - item.score)}
+											{" · "}
+											{item.angle}
+											{" · "}
+											via {item.source}
+										</span>
+									</div>
+									<h2 class="serif">
+										<a href={item.url} target="_blank" rel="noopener">
+											{item.title}
+										</a>
+									</h2>
+									<p class="item-summary">{item.one_liner}</p>
+									{primitives.length > 0 && (
+										<p class="item-primitives">
+											{primitives.map((p, idx) => (
+												<>
+													<span class="primitive">{p}</span>
+													{idx < primitives.length - 1 && <span class="dot"> · </span>}
+												</>
+											))}
+										</p>
+									)}
+								</div>
+							</article>
+						);
+					})}
+			</section>
+
+			{env.SUBSCRIBE_URL && (
+				<aside class="subscribe-block">
 					<div>
-						<dt>Items today</dt>
-						<dd>{briefing.row.kept_count}</dd>
+						<span class="eyebrow">Subscribe</span>
+						<h3 class="serif">Get tomorrow's briefing</h3>
+						<p>One email each morning. Top items developers shipped on Cloudflare in the last 24 hours, classified and ranked by Workers AI.</p>
+					</div>
+					<a href={env.SUBSCRIBE_URL} class="subscribe-button" target="_blank" rel="noopener">
+						Subscribe →
+					</a>
+				</aside>
+			)}
+
+			<footer class="how">
+				<span class="eyebrow">Colophon</span>
+				<h3 class="serif">How this is built</h3>
+				<p>
+					FlareCraft is two Workers in one repo. A scheduled <span class="primitive">pipeline Worker</span> runs daily on a Cron Trigger, fetches recent posts from Hacker News, classifies each via <span class="primitive">Workers AI</span> (Llama 3.3 70B with structured JSON output), generates embeddings (BGE base), deduplicates semantically against the corpus via <span class="primitive">Vectorize</span>, persists to <span class="primitive">D1</span>, archives raw JSON to <span class="primitive">R2</span>, and emails a digest via Resend. The whole pipeline is wrapped in <span class="primitive">Workflows</span> for durable execution and per-step retries. This SSR site is the second Worker — it reads from the same D1 in the request path and renders this page server-side, no rebuild needed when the pipeline updates.
+				</p>
+				<p class="how-meta">
+					Eight Cloudflare primitives, two Workers, one product. <a href="/about/">More on the architecture →</a>
+				</p>
+			</footer>
+		</main>
+
+		<aside class="editorial-rail" aria-label="Live system status">
+			<div class="rail-section">
+				<span class="pill-live">live</span>
+			</div>
+
+			<div class="rail-section">
+				<span class="eyebrow">Next briefing</span>
+				<div class="rail-stat-big serif">{nextRun.relative}</div>
+				<div class="rail-meta">{nextRun.absolute} &middot; daily</div>
+			</div>
+
+			<div class="rail-section">
+				<span class="eyebrow">Last run</span>
+				<div class="rail-stat-med serif">{lastRunRelative}</div>
+			</div>
+
+			<hr class="rail-rule" />
+
+			<div class="rail-section">
+				<span class="eyebrow">The corpus</span>
+				<dl class="rail-dl">
+					<div>
+						<dt>Briefings</dt>
+						<dd class="serif">{stats.briefingCount}</dd>
+					</div>
+					<div>
+						<dt>Items kept</dt>
+						<dd class="serif">{stats.itemsKept}</dd>
 					</div>
 					<div>
 						<dt>Sources scanned</dt>
-						<dd>{briefing.row.source_count}</dd>
-					</div>
-					<div>
-						<dt>Deduped</dt>
-						<dd>{briefing.row.deduped_count}</dd>
+						<dd class="serif">{stats.sourcesScanned}</dd>
 					</div>
 				</dl>
-			)
-		}
+			</div>
 
-		{
-			topPrimitives.length > 0 && (
-				<div class="primitive-row">
-					<span class="primitive-row-label">Across:</span>
-					{topPrimitives.map((p) => (
-						<span class="primitive-tag">
-							{p.name}
-							<span class="primitive-count">{p.count}</span>
-						</span>
-					))}
-				</div>
-			)
-		}
-	</header>
+			{topPrimitives.length > 0 && (
+				<>
+					<hr class="rail-rule" />
+					<div class="rail-section">
+						<span class="eyebrow">Top primitives</span>
+						<ul class="rail-primitives">
+							{topPrimitives.map((p) => (
+								<li>
+									<span class="primitive">{p.name}</span>
+									<span class="rail-count mono">{p.count}</span>
+								</li>
+							))}
+						</ul>
+					</div>
+				</>
+			)}
 
-	<section class="briefing">
-		{
-			!briefing && (
-				<div class="empty">
-					<p>
-						The first briefing hasn't run yet. Once the pipeline completes its
-						first cycle, this is where today's items will live.
-					</p>
-				</div>
-			)
-		}
+			<hr class="rail-rule" />
 
-		{
-			briefing && briefing.items.length === 0 && (
-				<div class="empty">
-					<p>
-						The pipeline ran but didn't surface anything noteworthy in the last
-						window. Check back tomorrow.
-					</p>
-				</div>
-			)
-		}
-
-		{
-			briefing &&
-				briefing.items.map((item, i) => {
-					const primitives = parsePrimitives(item.primitives);
-					return (
-						<article class={`item item--score-${item.score}`}>
-							<div class="item-meta">
-								<span class="item-num">{String(i + 1).padStart(2, "0")}</span>
-								<span class="item-score" title={`${item.score}/5`}>
-									{"★".repeat(item.score)}
-									{"☆".repeat(5 - item.score)}
-								</span>
-								<span class="item-angle">{item.angle}</span>
-								<span class="item-source">via {item.source}</span>
-							</div>
-							<h2>
-								<a href={item.url} target="_blank" rel="noopener">
-									{item.title}
-								</a>
-							</h2>
-							<p class="item-summary">{item.one_liner}</p>
-							{primitives.length > 0 && (
-								<ul class="item-primitives">
-									{primitives.map((p) => (
-										<li>{p}</li>
-									))}
-								</ul>
-							)}
-						</article>
-					);
-				})
-		}
-	</section>
-
-	<footer class="how">
-		<h3>How this is built</h3>
-		<p>
-			FlareCraft is two Workers in one repo. A scheduled <strong>pipeline Worker</strong> runs daily on a Cron Trigger, fetches recent posts from Hacker News, classifies each via <strong>Workers AI</strong> (Llama 3.3 70B with structured JSON output), generates embeddings (BGE base), deduplicates semantically against the corpus via <strong>Vectorize</strong>, persists to <strong>D1</strong>, archives raw JSON to <strong>R2</strong>, and emails a digest via Resend. The whole pipeline is wrapped in <strong>Cloudflare Workflows</strong> for durable execution and per-step retries. This <strong>SSR site</strong> is the second Worker — it reads from the same D1 in the request path and renders this page server-side, no rebuild needed when the pipeline updates.
-		</p>
-		<p class="how-meta">
-			Eight Cloudflare primitives, two Workers, one product. <a href="/about/">More on the architecture →</a>
-		</p>
-	</footer>
+			<div class="rail-section">
+				<span class="eyebrow">About</span>
+				<p class="rail-text">
+					FlareCraft is a working artifact for a VP of Developer Adoption interview process at Cloudflare.
+					<a href="/about/" class="rail-link">Read the architecture →</a>
+				</p>
+			</div>
+		</aside>
+	</div>
 </Layout>
+
+<style>
+	.hero {
+		margin-bottom: 56px;
+	}
+	.hero h1 {
+		font-size: var(--fs-h1);
+		font-weight: 700;
+		line-height: 1.05;
+		letter-spacing: -0.025em;
+		margin: 16px 0 20px;
+		font-variation-settings: "SOFT" 50;
+	}
+	.hero h1 i {
+		font-style: italic;
+		color: var(--orange-deep);
+	}
+	.lede {
+		font-size: 18px;
+		color: var(--ink-2);
+		max-width: 580px;
+		margin: 0;
+	}
+
+	.briefing {
+		margin: 0;
+	}
+	.empty {
+		padding: 48px 0;
+		color: var(--ink-3);
+		border-top: 1px solid var(--rule);
+		font-style: italic;
+	}
+
+	.item {
+		display: grid;
+		grid-template-columns: 56px 1fr;
+		gap: 24px;
+		padding: 32px 0;
+		border-top: 1px solid var(--rule);
+	}
+	.item:last-of-type {
+		border-bottom: 1px solid var(--rule);
+	}
+	.item--score-5 {
+		background: linear-gradient(
+			to right,
+			var(--orange-pale) 0%,
+			rgba(253, 233, 210, 0) 50%
+		);
+		margin: 0 -16px;
+		padding-left: 16px;
+		padding-right: 16px;
+	}
+	.item--score-5 .item-num {
+		color: var(--ember);
+	}
+
+	.item-num {
+		font-size: 28px;
+		font-weight: 600;
+		color: var(--ink-3);
+		font-variant-numeric: tabular-nums;
+		line-height: 1;
+		padding-top: 6px;
+		font-variation-settings: "SOFT" 50;
+	}
+
+	.item-meta {
+		margin-bottom: 10px;
+	}
+
+	.item h2 {
+		margin: 0 0 12px;
+		font-size: var(--fs-h3);
+		font-weight: 600;
+		line-height: 1.3;
+		letter-spacing: -0.01em;
+		font-variation-settings: "SOFT" 50;
+	}
+	.item h2 a {
+		text-decoration: none;
+	}
+	.item-summary {
+		margin: 0 0 14px;
+		font-size: 15.5px;
+		color: var(--ink-2);
+		line-height: 1.55;
+	}
+	.item-primitives {
+		margin: 0;
+		font-size: 14px;
+		color: var(--ember);
+	}
+	.item-primitives .dot {
+		color: var(--ink-3);
+		margin: 0 4px;
+	}
+
+	/* Subscribe block */
+	.subscribe-block {
+		display: flex;
+		gap: 32px;
+		align-items: center;
+		justify-content: space-between;
+		margin-top: 64px;
+		padding: 32px;
+		background: var(--paper-2);
+		border-radius: 4px;
+		flex-wrap: wrap;
+	}
+	.subscribe-block h3 {
+		font-weight: 600;
+		font-size: var(--fs-h3);
+		margin: 8px 0 6px;
+	}
+	.subscribe-block p {
+		font-size: 15px;
+		color: var(--ink-2);
+		margin: 0;
+		max-width: 460px;
+	}
+	.subscribe-button {
+		display: inline-block;
+		background: var(--ink);
+		color: var(--paper) !important;
+		text-decoration: none;
+		padding: 12px 24px;
+		border-radius: 4px;
+		font-weight: 600;
+		font-size: 15px;
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+	.subscribe-button:hover {
+		background: var(--orange-deep);
+	}
+
+	/* Colophon */
+	.how {
+		margin-top: 80px;
+		padding-top: 32px;
+		border-top: 1px solid var(--rule);
+		color: var(--ink-2);
+	}
+	.how h3 {
+		font-size: var(--fs-h3);
+		font-weight: 600;
+		margin: 8px 0 16px;
+		color: var(--ink);
+	}
+	.how p {
+		max-width: 660px;
+		font-size: 15px;
+		line-height: 1.65;
+	}
+	.how-meta {
+		margin-top: 16px;
+		font-size: 14px;
+		color: var(--ink-3);
+	}
+	.how-meta a {
+		color: var(--orange-deep);
+		text-decoration: none;
+		font-weight: 600;
+	}
+
+	/* Right rail */
+	.rail-section {
+		margin-bottom: 28px;
+	}
+	.rail-section .eyebrow {
+		margin-bottom: 8px;
+	}
+	.rail-stat-big {
+		font-size: 28px;
+		font-weight: 600;
+		line-height: 1.1;
+		letter-spacing: -0.02em;
+		font-variation-settings: "SOFT" 50;
+	}
+	.rail-stat-med {
+		font-size: 20px;
+		font-weight: 600;
+		font-variation-settings: "SOFT" 50;
+	}
+	.rail-meta {
+		font-size: 12px;
+		color: var(--ink-3);
+		margin-top: 4px;
+		font-family: var(--font-mono);
+	}
+	.rail-rule {
+		border: 0;
+		border-top: 1px solid var(--rule);
+		margin: 24px 0;
+	}
+	.rail-dl {
+		margin: 0;
+		padding: 0;
+	}
+	.rail-dl div {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		padding: 6px 0;
+		border-bottom: 1px dotted var(--rule);
+	}
+	.rail-dl div:last-child {
+		border-bottom: 0;
+	}
+	.rail-dl dt {
+		font-size: 13px;
+		color: var(--ink-3);
+		margin: 0;
+	}
+	.rail-dl dd {
+		font-size: 18px;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		margin: 0;
+		color: var(--ink);
+	}
+	.rail-primitives {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+	.rail-primitives li {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		padding: 6px 0;
+		border-bottom: 1px dotted var(--rule);
+	}
+	.rail-primitives li:last-child {
+		border-bottom: 0;
+	}
+	.rail-count {
+		font-size: 12px;
+		color: var(--ink-3);
+		font-variant-numeric: tabular-nums;
+	}
+	.rail-text {
+		font-size: 13px;
+		color: var(--ink-2);
+		line-height: 1.55;
+		margin: 0;
+	}
+	.rail-link {
+		display: inline-block;
+		margin-top: 6px;
+		color: var(--orange-deep);
+		text-decoration: none;
+		font-weight: 600;
+	}
+</style>

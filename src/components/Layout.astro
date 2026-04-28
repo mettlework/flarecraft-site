@@ -1,60 +1,118 @@
 ---
+import { env } from "cloudflare:workers";
+
 interface Props {
 	title: string;
 	description?: string;
 }
 
 const { title, description } = Astro.props;
+const subscribeUrl = env.SUBSCRIBE_URL;
+const siteUrl = env.SITE_URL ?? "https://flarecraft.dev";
+const ogImage = `${siteUrl}/brand/og-image.svg`;
 ---
 
 <!DOCTYPE html>
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
 		{description && <meta name="description" content={description} />}
+
+		<!-- Brand favicons -->
+		<link rel="icon" type="image/svg+xml" href="/brand/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="64x64" href="/brand/flarecraft-favicon-64.png" />
+		<link rel="icon" type="image/png" sizes="256x256" href="/brand/flarecraft-favicon-256.png" />
+		<link rel="apple-touch-icon" sizes="180x180" href="/brand/flarecraft-favicon-180.png" />
+
+		<!-- Open Graph -->
 		<meta property="og:title" content={title} />
 		{description && <meta property="og:description" content={description} />}
 		<meta property="og:type" content="website" />
+		<meta property="og:image" content={ogImage} />
+		<meta property="og:url" content={siteUrl} />
 		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:image" content={ogImage} />
+
+		<!-- Type stack: Fraunces (display + italic), Inter Tight (body), JetBrains Mono (meta/eyebrow) -->
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link
-			href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap"
+			href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=Inter+Tight:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap"
 			rel="stylesheet"
 		/>
 	</head>
 	<body>
-		<nav class="topnav">
-			<a href="/" class="brand">FlareCraft</a>
-			<div class="topnav-links">
+		<header class="topnav">
+			<a href="/" class="brand-link" aria-label="FlareCraft home">
+				<svg viewBox="0 0 64 64" width="28" height="28" aria-hidden="true">
+					<path d="M16 10 H50 V20 H26 V30 H46 V38 H26 V54 H16 Z" fill="#1d1d1b"></path>
+					<rect x="26" y="28" width="22" height="6" fill="#e35a14"></rect>
+				</svg>
+				<span class="wordmark">Flare<i>Craft</i></span>
+			</a>
+			<nav class="topnav-links">
 				<a href="/archive/">Archive</a>
 				<a href="/about/">About</a>
-			</div>
-		</nav>
+				{subscribeUrl && (
+					<a href={subscribeUrl} class="subscribe-cta" target="_blank" rel="noopener">
+						Subscribe →
+					</a>
+				)}
+			</nav>
+		</header>
 
-		<main>
-			<slot />
-		</main>
+		<slot />
+
+		<footer class="site-footer">
+			<div class="ember-bar"></div>
+			<div class="site-footer-inner">
+				<div>
+					<span class="serif italic">FlareCraft</span> — a daily AI-curated briefing of what developers are shipping on the Cloudflare developer platform.
+				</div>
+				<div class="footer-meta">
+					Built end-to-end on Cloudflare. <a href="https://github.com/mettlework/flarecraft-site" target="_blank" rel="noopener">Source on GitHub</a>.
+				</div>
+			</div>
+		</footer>
 
 		<style is:global>
 			:root {
-				--bg: #faf8f5;
-				--bg-soft: #f3eee7;
-				--fg: #1a1a1a;
-				--fg-soft: #4a4a4a;
-				--muted: #6b6b6b;
-				--border: #e5e1db;
-				--accent: #f6821f;
-				--accent-soft: #fef1e4;
-				--max: 880px;
-				--font-serif: "Fraunces", Georgia, serif;
-				--font-sans:
-					"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-					"Segoe UI", sans-serif;
+				/* Surfaces */
+				--paper: #faf8f5;
+				--paper-2: #f3efe8;
+				--rule: #e6e1d8;
+				--rule-2: #d4cfc3;
+				/* Ink */
+				--ink: #1d1d1b;
+				--ink-2: #3a3a36;
+				--ink-3: #6b675e;
+				/* Flare */
+				--orange: #f38020;
+				--orange-deep: #e35a14;
+				--orange-soft: #fbad41;
+				--orange-pale: #fde9d2;
+				--ember: #b03a0d;
+				/* Type */
+				--font-serif: "Fraunces", "Times New Roman", serif;
+				--font-body: "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
+				--font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+				/* Editorial scale */
+				--fs-h1: clamp(40px, 6.4vw, 64px);
+				--fs-h2: 30px;
+				--fs-h3: 22px;
+				--fs-body: 16px;
+				--fs-meta: 11px;
+				--tracking-meta: 0.2em;
+				/* Layout */
+				--col-content: 720px;
+				--col-rail: 280px;
+				--gutter: 56px;
+				--max-width: calc(var(--col-content) + var(--col-rail) + var(--gutter));
+				/* Motion */
+				--ease: cubic-bezier(0.2, 0.65, 0.25, 1);
 			}
 
 			* {
@@ -65,10 +123,12 @@ const { title, description } = Astro.props;
 			body {
 				margin: 0;
 				padding: 0;
-				background: var(--bg);
-				color: var(--fg);
-				font-family: var(--font-sans);
+				background: var(--paper);
+				color: var(--ink);
+				font-family: var(--font-body);
+				font-size: var(--fs-body);
 				line-height: 1.55;
+				font-feature-settings: "ss01", "ss02";
 				-webkit-font-smoothing: antialiased;
 				-moz-osx-font-smoothing: grayscale;
 			}
@@ -77,251 +137,195 @@ const { title, description } = Astro.props;
 				color: inherit;
 				text-decoration-thickness: 1px;
 				text-underline-offset: 3px;
+				transition: color 0.15s var(--ease);
 			}
 			a:hover {
-				color: var(--accent);
+				color: var(--orange-deep);
 			}
 
+			.serif {
+				font-family: var(--font-serif);
+				font-optical-sizing: auto;
+				font-variation-settings: "SOFT" 50;
+			}
+			.serif.italic {
+				font-style: italic;
+			}
+			.mono {
+				font-family: var(--font-mono);
+			}
+			.sc {
+				font-variant: small-caps;
+				letter-spacing: 0.04em;
+			}
+			.eyebrow {
+				font-family: var(--font-mono);
+				font-size: var(--fs-meta);
+				letter-spacing: var(--tracking-meta);
+				text-transform: uppercase;
+				color: var(--orange-deep);
+				font-weight: 600;
+				display: block;
+			}
+
+			/* Primitive tag — italic small-caps in ember.
+			   Use everywhere a Cloudflare primitive name appears. */
+			.primitive {
+				font-family: var(--font-serif);
+				font-style: italic;
+				font-variant: small-caps;
+				font-weight: 500;
+				color: var(--ember);
+				letter-spacing: 0.04em;
+				white-space: nowrap;
+			}
+
+			/* Status pill — live indicator */
+			.pill-live {
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				background: var(--orange-pale);
+				color: var(--ember);
+				padding: 3px 10px;
+				border-radius: 3px;
+				font: 500 11.5px/1.4 var(--font-mono);
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+			}
+			.pill-live::before {
+				content: "";
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: var(--orange-deep);
+				box-shadow: 0 0 0 3px rgba(227, 90, 20, 0.18);
+				animation: pulse 2.4s var(--ease) infinite;
+			}
+			@keyframes pulse {
+				0%, 100% { box-shadow: 0 0 0 3px rgba(227, 90, 20, 0.18); }
+				50% { box-shadow: 0 0 0 6px rgba(227, 90, 20, 0.05); }
+			}
+
+			.ember-bar {
+				height: 2px;
+				background: var(--orange-deep);
+				width: 100%;
+			}
+
+			/* Top nav */
 			.topnav {
 				display: flex;
 				align-items: center;
 				justify-content: space-between;
-				max-width: var(--max);
+				max-width: var(--max-width);
 				margin: 0 auto;
 				padding: 24px 32px;
-				border-bottom: 1px solid var(--border);
+				border-bottom: 1px solid var(--rule);
 			}
-			.brand {
+			.brand-link {
+				display: inline-flex;
+				align-items: center;
+				gap: 10px;
+				text-decoration: none;
+				color: var(--ink);
+			}
+			.brand-link:hover {
+				color: var(--ink);
+			}
+			.wordmark {
 				font-family: var(--font-serif);
 				font-weight: 700;
-				font-size: 20px;
+				font-size: 22px;
 				letter-spacing: -0.01em;
-				text-decoration: none;
+				font-variation-settings: "SOFT" 50;
 			}
-			.brand:hover {
-				color: var(--accent);
+			.wordmark i {
+				font-style: italic;
+				color: var(--orange-deep);
+				font-weight: 600;
 			}
 			.topnav-links {
 				display: flex;
-				gap: 24px;
+				gap: 22px;
 				font-size: 14px;
-				color: var(--muted);
+				color: var(--ink-3);
+				align-items: center;
 			}
 			.topnav-links a {
 				text-decoration: none;
 			}
-
-			main {
-				max-width: var(--max);
-				margin: 0 auto;
-				padding: 64px 32px 96px;
-			}
-
-			.hero {
-				margin-bottom: 64px;
-			}
-			.eyebrow {
-				margin: 0 0 28px;
-				font-size: 12px;
-				letter-spacing: 0.14em;
-				text-transform: uppercase;
-				color: var(--accent);
+			.subscribe-cta {
+				background: var(--ink);
+				color: var(--paper) !important;
+				padding: 7px 14px;
+				border-radius: 4px;
 				font-weight: 600;
-			}
-			h1 {
-				font-family: var(--font-serif);
-				font-weight: 700;
-				font-size: clamp(36px, 6vw, 64px);
-				line-height: 1.05;
-				letter-spacing: -0.025em;
-				margin: 0 0 28px;
-			}
-			.lede {
-				font-size: 19px;
-				color: var(--fg-soft);
-				max-width: 640px;
-				margin: 0 0 40px;
-			}
-
-			.stats {
-				display: flex;
-				gap: 48px;
-				margin: 0 0 32px;
-				padding: 24px 0;
-				border-top: 1px solid var(--border);
-				border-bottom: 1px solid var(--border);
-			}
-			.stats div {
-				margin: 0;
-			}
-			.stats dt {
-				font-size: 11px;
-				letter-spacing: 0.12em;
-				text-transform: uppercase;
-				color: var(--muted);
-				margin: 0 0 4px;
-				font-weight: 600;
-			}
-			.stats dd {
-				font-family: var(--font-serif);
-				font-size: 32px;
-				font-weight: 600;
-				margin: 0;
-				font-variant-numeric: tabular-nums;
-				letter-spacing: -0.02em;
-			}
-
-			.primitive-row {
-				display: flex;
-				flex-wrap: wrap;
-				align-items: center;
-				gap: 8px;
 				font-size: 13px;
+				font-family: var(--font-body);
 			}
-			.primitive-row-label {
-				color: var(--muted);
-				margin-right: 4px;
-			}
-			.primitive-tag {
-				display: inline-flex;
-				align-items: center;
-				gap: 6px;
-				background: var(--bg-soft);
-				padding: 4px 10px;
-				border-radius: 999px;
-				font-weight: 500;
-			}
-			.primitive-count {
-				color: var(--accent);
-				font-weight: 600;
-				font-variant-numeric: tabular-nums;
+			.subscribe-cta:hover {
+				background: var(--orange-deep);
+				color: var(--paper) !important;
 			}
 
-			.briefing {
-				margin: 0;
-			}
-			.empty {
-				padding: 48px 0;
-				color: var(--muted);
-				border-top: 1px solid var(--border);
-			}
-
-			.item {
-				border-top: 1px solid var(--border);
-				padding: 32px 0;
-			}
-			.item:last-child {
-				border-bottom: 1px solid var(--border);
-			}
-			.item--score-5 {
-				background: linear-gradient(
-					to right,
-					var(--accent-soft) 0%,
-					transparent 40%
-				);
-				margin: 0 -16px;
-				padding-left: 16px;
-				padding-right: 16px;
-			}
-			.item-meta {
-				display: flex;
-				align-items: center;
-				gap: 16px;
-				font-size: 12px;
-				color: var(--muted);
-				margin-bottom: 12px;
-				flex-wrap: wrap;
-			}
-			.item-num {
-				font-family: var(--font-serif);
-				font-variant-numeric: tabular-nums;
-				font-weight: 600;
-				color: var(--fg);
-				font-size: 14px;
-			}
-			.item-score {
-				color: var(--accent);
-				letter-spacing: 1px;
-			}
-			.item-angle {
-				font-size: 11px;
-				letter-spacing: 0.08em;
-				text-transform: uppercase;
-				font-weight: 600;
-				background: var(--bg-soft);
-				padding: 3px 8px;
-				border-radius: 4px;
-			}
-			.item-source {
-				font-style: italic;
-			}
-
-			.item h2 {
-				font-family: var(--font-serif);
-				font-weight: 600;
-				font-size: 24px;
-				line-height: 1.25;
-				letter-spacing: -0.015em;
-				margin: 0 0 12px;
-			}
-			.item h2 a {
-				text-decoration: none;
-			}
-			.item h2 a:hover {
-				color: var(--accent);
-			}
-			.item-summary {
-				font-size: 16px;
-				color: var(--fg-soft);
-				margin: 0 0 16px;
-				max-width: 640px;
-			}
-			.item-primitives {
-				list-style: none;
-				padding: 0;
-				margin: 0;
-				display: flex;
-				flex-wrap: wrap;
-				gap: 6px;
-			}
-			.item-primitives li {
-				font-size: 12px;
-				color: var(--accent);
-				background: var(--accent-soft);
-				padding: 3px 8px;
-				border-radius: 4px;
-				font-weight: 600;
-			}
-
-			.how {
+			/* Site footer */
+			.site-footer {
 				margin-top: 96px;
-				padding-top: 48px;
-				border-top: 1px solid var(--border);
-				color: var(--fg-soft);
-				font-size: 15px;
 			}
-			.how h3 {
-				font-family: var(--font-serif);
-				font-size: 20px;
-				font-weight: 600;
-				margin: 0 0 16px;
-				color: var(--fg);
+			.site-footer-inner {
+				max-width: var(--max-width);
+				margin: 0 auto;
+				padding: 24px 32px 64px;
+				display: flex;
+				justify-content: space-between;
+				gap: 32px;
+				font-size: 13px;
+				color: var(--ink-3);
+				flex-wrap: wrap;
 			}
-			.how p {
-				max-width: 720px;
-			}
-			.how strong {
-				color: var(--fg);
-				font-weight: 600;
-			}
-			.how-meta {
-				margin-top: 24px;
-				font-size: 14px;
-				color: var(--muted);
-			}
-			.how-meta a {
-				color: var(--accent);
+			.site-footer-inner a {
+				color: var(--orange-deep);
 				text-decoration: none;
+			}
+			.footer-meta {
+				font-family: var(--font-mono);
+				font-size: 12px;
+			}
+
+			/* Editorial layout: content + sticky rail */
+			.editorial {
+				max-width: var(--max-width);
+				margin: 0 auto;
+				padding: 64px 32px 32px;
+				display: grid;
+				grid-template-columns: var(--col-content) var(--col-rail);
+				gap: var(--gutter);
+				align-items: start;
+			}
+			.editorial-main {
+				min-width: 0;
+			}
+			.editorial-rail {
+				position: sticky;
+				top: 32px;
+				font-size: 14px;
+			}
+			@media (max-width: 1080px) {
+				.editorial {
+					grid-template-columns: 1fr;
+					gap: 48px;
+				}
+				.editorial-rail {
+					position: static;
+				}
+			}
+
+			/* Single-column variant for prose pages */
+			.prose-page {
+				max-width: var(--col-content);
+				margin: 0 auto;
+				padding: 64px 32px 32px;
 			}
 		</style>
 	</body>

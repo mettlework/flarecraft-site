@@ -21,6 +21,7 @@
 	],
 
 	"vars": {
-		"SITE_URL": "https://flarecraft.dev"
+		"SITE_URL": "https://flarecraft.dev",
+		"SUBSCRIBE_URL": "https://flare-craft.beehiiv.com/"
 	}
 }

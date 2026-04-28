@@ -30,7 +30,8 @@ Every day at 08:00 CDT a Cloudflare Cron Trigger fires. A Workflow runs that:
 3. **Embeds** each kept post via Workers AI (BGE base, 768 dims) and queries Vectorize for the nearest neighbor in the existing corpus — if cosine similarity ≥ 0.92, treats it as a semantic duplicate and skips
 4. **Persists** survivors to D1, archives raw normalized JSON to R2 keyed by `date/source/id`
 5. **Finalizes** the briefing record with run counts
-6. **Emails** the top items as an HTML digest via Resend
+6. **Sleeps** briefly (a `step.sleep` checkpoint) so the digest step gets a fresh Worker invocation with a clean subrequest budget
+7. **Emails** the top items as an HTML digest via Resend, while Beehiiv handles public subscriber capture at `flare-craft.beehiiv.com`
 
 A separate SSR Worker reads from D1 in the request path and renders the live briefing at flarecraft.dev — no rebuild needed when the pipeline updates the data.
 
@@ -103,7 +104,11 @@ A separate SSR Worker reads from D1 in the request path and renders the live bri
 | **R2** | Egress-free archive of raw post JSON, keyed by date/source/id. The corpus can be re-classified later when prompt or model improves, without re-fetching from HN. |
 | **Pages / Static Assets** | Site is server-rendered on a Worker via `@astrojs/cloudflare`. Static assets served by the same Worker via the `ASSETS` binding. Static and dynamic in one project. |
 
-External dependency: **Resend** for transactional email. Cloudflare's MailChannels arrangement for free outbound email ended in 2024; Resend's API is a single POST so the bundle weight is zero.
+External dependencies:
+- **Beehiiv** — public subscribe page at `flare-craft.beehiiv.com`. Audience layer (the *who*: subscribers, growth, archive, list management).
+- **Resend** — transactional email transport. Single POST per send, no SDK weight.
+
+The dual-platform split is deliberate: Beehiiv's programmatic publish API is gated to enterprise tier, which surfaced as a 403 at runtime. Rather than pay $39/mo for an unjustified primitive, the architecture separates audience capture (Beehiiv) from delivery (Resend) — which is how many real newsletter products operate. Subscribers join via Beehiiv; the daily digest goes out via Resend. The bridge between them — sync Beehiiv subscribers → Resend audience and send to the list — is a single function in `pipeline/src/lib/`, queued for v2.
 
 ---
 
@@ -126,6 +131,8 @@ External dependency: **Resend** for transactional email. Cloudflare's MailChanne
   - Workers AI's `response_format: json_schema` returns one of three different shapes depending on model — `{response: string}`, `{response: object}`, or the bare object. Caller has to coerce.
   - Vectorize's `returnMetadata` parameter accepts `"none" | "indexed" | "all"`, not booleans — type errors only at runtime.
   - Wrangler 4's experimental auto-provisioning created the missing `SESSION` KV namespace on the fly during deploy — beautiful when it works; could surprise a less attentive deployer.
+  - Workers Free's 50 subrequest/invocation limit pooled across the entire workflow run, not per `step.do` as I'd assumed. The `send-digest` step inherited an exhausted budget. Fix: a `step.sleep` checkpoint before digest forces a fresh invocation. Belt-and-suspenders: also upgraded to Workers Paid for the 1,000 subrequest ceiling.
+  - Beehiiv's Posts API (programmatic publish) is enterprise-tier-only. The runtime 403 forced the Beehiiv-for-audience + Resend-for-send split — which turned out to be the more honest architecture.
 
 These aren't complaints; they're the surface area of a fast-moving platform mid-consolidation. Naming them is part of the job.
 

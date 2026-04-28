@@ -60,6 +60,50 @@ export default {
 			return Response.json(status);
 		}
 
+		// Re-publish the latest completed briefing to Beehiiv. Useful when
+		// the digest step short-circuits on a deduped run, or for admin
+		// re-sends after a delivery failure.
+		if (url.pathname === "/republish-latest" && request.method === "POST") {
+			const auth = request.headers.get("authorization");
+			if (auth !== `Bearer ${env.PIPELINE_AUTH_TOKEN}`) {
+				return new Response("Unauthorized", { status: 401 });
+			}
+
+			const { sendDigest } = await import("./lib/digest");
+
+			const briefing = await env.DB.prepare(
+				`SELECT id FROM briefings
+				 WHERE status = 'completed' AND kept_count > 0
+				 ORDER BY run_started_at DESC LIMIT 1`,
+			).first<{ id: string }>();
+
+			if (!briefing) {
+				return Response.json(
+					{ error: "no completed briefing with items to republish" },
+					{ status: 404 },
+				);
+			}
+
+			const items = await env.DB.prepare(
+				`SELECT * FROM items
+				 WHERE briefing_id = ? AND is_about_cf = 1
+				 ORDER BY score DESC, posted_at DESC
+				 LIMIT 12`,
+			)
+				.bind(briefing.id)
+				.all();
+
+			await sendDigest(env, {
+				briefingId: briefing.id,
+				items: (items.results ?? []) as never,
+			});
+
+			return Response.json({
+				republished: briefing.id,
+				items: items.results?.length ?? 0,
+			});
+		}
+
 		return new Response("flarecraft-pipeline", { status: 200 });
 	},
 

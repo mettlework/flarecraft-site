@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <title>FlareCraft — Open Graph image</title>
+  
+  <rect width="1200" height="630" fill="#faf8f5"></rect>
+  <rect y="628" width="1200" height="2" fill="#e35a14"></rect>
+  <g transform="translate(96,108)">
+    <g transform="scale(2.5)">
+      <path d="M16 10 H50 V20 H26 V30 H46 V38 H26 V54 H16 Z" fill="#1d1d1b"></path>
+      <rect x="26" y="28" width="22" height="6" fill="#e35a14"></rect>
+    </g>
+  </g>
+  <text x="96" y="392" class="roman">Flare<tspan class="italic">Craft</tspan></text>
+  <text x="96" y="450" class="tag">The system reporting on the platform.</text>
+  <text x="96" y="568" class="meta">flarecraft.dev · vol. 1 · no. 14 · april 2026</text>
+</svg>

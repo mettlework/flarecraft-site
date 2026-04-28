@@ -10,22 +10,20 @@ const briefings = env.DB ? await getRecentBriefings(env.DB, 30) : [];
 	title="Archive — FlareCraft"
 	description="Past daily briefings of Cloudflare developer activity."
 >
-	<header class="hero">
-		<p class="eyebrow">Archive</p>
-		<h1>Past briefings</h1>
-		<p class="lede">
-			Every daily run is preserved. Click any date to see what made the cut.
-		</p>
-	</header>
+	<div class="prose-page">
+		<header class="archive-hero">
+			<span class="eyebrow">Archive</span>
+			<h1 class="serif">Past <i>briefings</i></h1>
+			<p class="lede">
+				Every daily run is preserved. Click any date to see what made the cut.
+			</p>
+		</header>
 
-	<section class="archive">
-		{
-			briefings.length === 0 && (
+		<section class="archive-list">
+			{briefings.length === 0 && (
 				<p class="empty">No completed briefings yet.</p>
-			)
-		}
-		{
-			briefings.map((b) => {
+			)}
+			{briefings.map((b) => {
 				const date = new Date(b.run_started_at).toLocaleDateString("en-US", {
 					weekday: "long",
 					month: "long",
@@ -34,58 +32,79 @@ const briefings = env.DB ? await getRecentBriefings(env.DB, 30) : [];
 				});
 				return (
 					<a class="row" href={`/briefing/${b.id}/`}>
-						<div class="row-date">{date}</div>
+						<div class="row-date serif">{date}</div>
 						<div class="row-stats">
-							<span><strong>{b.kept_count}</strong> items</span>
-							<span class="muted">/</span>
-							<span class="muted">{b.classified_count} classified</span>
-							<span class="muted">/</span>
-							<span class="muted">{b.source_count} sourced</span>
+							<span><strong class="mono">{b.kept_count}</strong> kept</span>
+							<span class="dim">/</span>
+							<span class="dim mono">{b.classified_count} classified</span>
+							<span class="dim">/</span>
+							<span class="dim mono">{b.source_count} sourced</span>
 						</div>
 					</a>
 				);
-			})
-		}
-	</section>
+			})}
+		</section>
+	</div>
 </Layout>
 
 <style>
-	.empty {
-		color: var(--muted);
-		padding: 32px 0;
+	.archive-hero {
+		margin-bottom: 48px;
 	}
-	.archive {
-		border-top: 1px solid var(--border);
+	.archive-hero h1 {
+		font-size: var(--fs-h1);
+		font-weight: 700;
+		line-height: 1.05;
+		letter-spacing: -0.025em;
+		margin: 16px 0 20px;
+		font-variation-settings: "SOFT" 50;
+	}
+	.archive-hero h1 i {
+		font-style: italic;
+		color: var(--orange-deep);
+	}
+	.lede {
+		font-size: 18px;
+		color: var(--ink-2);
+		margin: 0;
+	}
+	.empty {
+		color: var(--ink-3);
+		padding: 32px 0;
+		font-style: italic;
+	}
+	.archive-list {
+		border-top: 1px solid var(--rule);
 	}
 	.row {
 		display: flex;
 		justify-content: space-between;
 		align-items: baseline;
 		padding: 20px 0;
-		border-bottom: 1px solid var(--border);
+		border-bottom: 1px solid var(--rule);
 		text-decoration: none;
-		color: var(--fg);
+		color: var(--ink);
 		gap: 24px;
 		flex-wrap: wrap;
 	}
-	.row:hover {
-		color: var(--accent);
+	.row:hover .row-date {
+		color: var(--orange-deep);
 	}
 	.row-date {
-		font-family: var(--font-serif);
 		font-size: 18px;
 		font-weight: 600;
 	}
 	.row-stats {
-		font-size: 14px;
-		color: var(--fg-soft);
+		font-size: 13px;
 		display: flex;
 		gap: 8px;
+		color: var(--ink-2);
 	}
 	.row-stats strong {
-		color: var(--fg);
+		color: var(--ink);
+		font-weight: 600;
 	}
-	.muted {
-		color: var(--muted);
+	.row-stats .dim {
+		color: var(--ink-3);
 	}
 </style>
