@@ -54,14 +54,12 @@ function nextRunInfo(): { absolute: string; relative: string } {
 const nextRun = nextRunInfo();
 const dateLabel = briefing
 	? new Date(briefing.row.run_started_at).toLocaleDateString("en-US", {
-			weekday: "long",
-			month: "long",
+			month: "short",
 			day: "numeric",
 			year: "numeric",
 		})
 	: new Date().toLocaleDateString("en-US", {
-			weekday: "long",
-			month: "long",
+			month: "short",
 			day: "numeric",
 			year: "numeric",
 		});
@@ -94,10 +92,15 @@ const lastRunRelative = (() => {
 				<p class="lede">
 					The last 24 hours, classified and ranked by Workers AI.
 				</p>
-				<p class="hero-meta">
-					<span class="serif italic">8 Cloudflare primitives <span class="hero-dot">·</span> 2 Workers <span class="hero-dot">·</span> 1 daily briefing.</span>
-					<a href="/about/" class="hero-cta">Architecture →</a>
-				</p>
+				<div class="hero-meta">
+					<p class="hero-meta-line serif italic">
+						8 Cloudflare primitives <span class="hero-dot">·</span> 2 Workers
+					</p>
+					<p class="hero-meta-line hero-meta-bottom">
+						<span class="serif italic">1 daily briefing.</span>
+						<a href="/about/" class="hero-cta">Architecture →</a>
+					</p>
+				</div>
 			</header>
 
 			{summary && (summary.positives.length > 0 || summary.negatives.length > 0) && (
@@ -312,15 +315,20 @@ const lastRunRelative = (() => {
 	}
 	.hero-meta {
 		margin: 0;
+	}
+	.hero-meta-line {
+		margin: 0;
 		font-size: 16px;
 		color: var(--ink-3);
+		font-variation-settings: "SOFT" 50;
+		line-height: 1.4;
+	}
+	.hero-meta-bottom {
+		margin-top: 4px;
 		display: flex;
 		align-items: baseline;
 		gap: 16px;
 		flex-wrap: wrap;
-	}
-	.hero-meta .serif {
-		font-variation-settings: "SOFT" 50;
 	}
 	.hero-dot {
 		color: var(--rule-2);
