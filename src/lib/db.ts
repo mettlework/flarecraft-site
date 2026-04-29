@@ -14,10 +14,15 @@ export interface BriefingRow {
 	summary_json: string | null;
 }
 
+export interface SummaryEntry {
+	title: string;
+	line: string;
+	url?: string; // v1.2+: resolved server-side from candidate index
+}
 export interface BriefingSummary {
-	positives: { title: string; line: string }[];
-	negatives: { title: string; line: string }[];
-	questions: { title: string; line: string }[];
+	positives: SummaryEntry[];
+	negatives: SummaryEntry[];
+	questions: SummaryEntry[];
 }
 
 export function parseSummary(raw: string | null): BriefingSummary | null {

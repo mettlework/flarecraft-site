@@ -77,13 +77,18 @@ function renderHtml(p: DigestPayload, siteUrl: string): string {
 		const { positives, negatives, questions } = p.summary;
 		if (positives.length === 0 && negatives.length === 0 && questions.length === 0) return "";
 
-		// Title→url lookup so summary entries link to their source posts.
+		// v1.2+: each summary entry carries `url` directly (resolved server-side
+		// from candidate index in summary.ts). Fallback to title lookup for
+		// legacy summaries — handles AI editorial drift where prefixes get
+		// stripped when summarizing.
 		const urlByTitle = new Map<string, string>();
 		for (const it of p.items) urlByTitle.set(it.title.trim(), it.url);
+		const urlForEntry = (entry: { title: string; url?: string }): string | undefined =>
+			entry.url || urlByTitle.get(entry.title.trim());
 
 		const renderSection = (
 			heading: string,
-			items: { title: string; line: string }[],
+			items: { title: string; line: string; url?: string }[],
 			marker: string,
 			markerColor: string,
 			isFirst: boolean,
@@ -91,7 +96,7 @@ function renderHtml(p: DigestPayload, siteUrl: string): string {
 			if (items.length === 0) return "";
 			const lis = items
 				.map((it) => {
-					const url = urlByTitle.get(it.title.trim());
+					const url = urlForEntry(it);
 					const titleHtml = url
 						? `<a href="${escape(url)}" style="color:#1d1d1b;text-decoration:none;border-bottom:1px solid #d4cfc3;font-weight:600;">${escape(it.title)}.</a>`
 						: `<strong style="color:#1d1d1b;font-weight:600;">${escape(it.title)}.</strong>`;

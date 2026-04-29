@@ -58,7 +58,7 @@ const dateLabel = new Date(briefing.row.run_started_at).toLocaleDateString(
 							<h3 class="serif">What's working</h3>
 							<ol>
 								{summary.positives.map((p) => {
-									const url = urlForTitle(p.title);
+									const url = urlFor(p);
 									return (
 										<li>
 											{url ? (
@@ -80,7 +80,7 @@ const dateLabel = new Date(briefing.row.run_started_at).toLocaleDateString(
 							<h3 class="serif">What's friction</h3>
 							<ol>
 								{summary.negatives.map((p) => {
-									const url = urlForTitle(p.title);
+									const url = urlFor(p);
 									return (
 										<li>
 											{url ? (
@@ -102,7 +102,7 @@ const dateLabel = new Date(briefing.row.run_started_at).toLocaleDateString(
 							<h3 class="serif">What's being asked</h3>
 							<ol>
 								{summary.questions.map((p) => {
-									const url = urlForTitle(p.title);
+									const url = urlFor(p);
 									return (
 										<li>
 											{url ? (

@@ -12,15 +12,17 @@ import {
 const briefing = env.DB ? await getLatestBriefing(env.DB) : null;
 const summary = briefing ? parseSummary(briefing.row.summary_json) : null;
 
-// Build a title→url map so summary entries can link back to their
-// source post. The summary AI returns the exact title verbatim;
-// we trim/normalize to avoid whitespace mismatches.
+// Title→url map as a fallback for legacy summaries. v1.2+ summaries carry
+// `url` directly on each entry, resolved server-side. Fallback handles
+// the AI's editorial drift (it strips prefixes like "[r/CloudFlare]" and
+// "Comment on:" when summarizing, breaking exact-title matches).
 const itemUrlByTitle = new Map<string, string>();
 for (const item of briefing?.items ?? []) {
 	itemUrlByTitle.set(item.title.trim(), item.url);
 }
-function urlForTitle(title: string): string | null {
-	return itemUrlByTitle.get(title.trim()) ?? null;
+function urlFor(entry: { title: string; url?: string }): string | null {
+	if (entry.url) return entry.url; // v1.2+ — already resolved
+	return itemUrlByTitle.get(entry.title.trim()) ?? null;
 }
 const stats = env.DB
 	? await getCorpusStats(env.DB)
@@ -123,7 +125,7 @@ function sourceLabel(source: string): string {
 								<h3 class="serif">What's working</h3>
 								<ol>
 									{summary.positives.map((p) => {
-										const url = urlForTitle(p.title);
+										const url = urlFor(p);
 										return (
 											<li>
 												{url ? (
@@ -145,7 +147,7 @@ function sourceLabel(source: string): string {
 								<h3 class="serif">What's friction</h3>
 								<ol>
 									{summary.negatives.map((p) => {
-										const url = urlForTitle(p.title);
+										const url = urlFor(p);
 										return (
 											<li>
 												{url ? (
@@ -167,7 +169,7 @@ function sourceLabel(source: string): string {
 								<h3 class="serif">What's being asked</h3>
 								<ol>
 									{summary.questions.map((p) => {
-										const url = urlForTitle(p.title);
+										const url = urlFor(p);
 										return (
 											<li>
 												{url ? (

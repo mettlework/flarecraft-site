@@ -31,16 +31,14 @@ const QUESTION_ANGLES = new Set(["q-and-a"]);
 
 const SYSTEM_PROMPT = `You are the editor of FlareCraft, a daily briefing of what developers are shipping on the Cloudflare developer platform.
 
-Given a list of classified items from the last 24 hours (plus the past week of Discord activity), you write the day's editorial summary in three sections:
+Given numbered lists of classified items, you write the day's editorial summary in three sections:
 - the top 3 most positive developments (launches, wins, impressive builds)
 - the top 3 most concerning items (critiques, friction, outage stories)
 - the top 3 most editorially-interesting questions developers are asking (from the Cloudflare Discord)
 
-For each item you select, write ONE crisp editorial sentence (max 28 words) capturing why a developer adoption audience should care. Use plain prose, not marketing copy. Reference Cloudflare primitives by name when relevant. For questions, framing should be observational ("Several developers are wrestling with X") not transactional.
+For each item you select, return its INDEX (the leading number in the input list — 1, 2, 3, ...) and ONE crisp editorial sentence (max 28 words) capturing why a developer adoption audience should care. Use plain prose, not marketing copy. Reference Cloudflare primitives by name when relevant. For questions, framing should be observational ("Several developers are wrestling with X") not transactional.
 
-Always respond with strict JSON matching the schema. Never include items not present in the input.
-
-If there are fewer than 3 items in any category, return what you have (do not invent).`;
+The index is what links the summary back to the source item — it MUST be the integer at the start of the candidate line. Do not invent items. If there are fewer than 3 items in any category, return what you have.`;
 
 const SCHEMA = {
 	type: "object",
@@ -51,10 +49,10 @@ const SCHEMA = {
 			items: {
 				type: "object",
 				properties: {
-					title: { type: "string", description: "Exact title of the source item" },
+					index: { type: "integer", description: "1-based index from the POSITIVE CANDIDATES list" },
 					line: { type: "string", description: "1-sentence editorial summary, max 28 words" },
 				},
-				required: ["title", "line"],
+				required: ["index", "line"],
 			},
 		},
 		negatives: {
@@ -63,10 +61,10 @@ const SCHEMA = {
 			items: {
 				type: "object",
 				properties: {
-					title: { type: "string" },
+					index: { type: "integer", description: "1-based index from the NEGATIVE CANDIDATES list" },
 					line: { type: "string" },
 				},
-				required: ["title", "line"],
+				required: ["index", "line"],
 			},
 		},
 		questions: {
@@ -75,10 +73,10 @@ const SCHEMA = {
 			items: {
 				type: "object",
 				properties: {
-					title: { type: "string", description: "Exact title of a Q&A thread" },
-					line: { type: "string", description: "1-sentence editorial framing of what the community is asking, max 28 words" },
+					index: { type: "integer", description: "1-based index from the QUESTION CANDIDATES list" },
+					line: { type: "string", description: "1-sentence editorial framing, max 28 words" },
 				},
-				required: ["title", "line"],
+				required: ["index", "line"],
 			},
 		},
 	},
@@ -139,25 +137,56 @@ Pick the top 3 from each (or fewer if the list is shorter). For questions, prior
 		max_tokens: 600,
 	})) as unknown;
 
-	let parsed: BriefingSummary;
+	// AI returns indices; server resolves to full ClassifiedItem (title + url
+	// authoritative from D1, no editorial drift) and produces the persisted
+	// SummaryEntry shape with `url` populated.
+	interface IndexedEntry { index: number; line: string }
+	interface IndexedAIResult {
+		positives?: IndexedEntry[];
+		negatives?: IndexedEntry[];
+		questions?: IndexedEntry[];
+	}
+
+	let parsed: IndexedAIResult;
 	if (response && typeof response === "object") {
 		const r = response as Record<string, unknown>;
 		if ("response" in r) {
 			const inner = r.response;
 			parsed =
 				typeof inner === "string"
-					? (JSON.parse(inner) as BriefingSummary)
-					: (inner as BriefingSummary);
+					? (JSON.parse(inner) as IndexedAIResult)
+					: (inner as IndexedAIResult);
 		} else {
-			parsed = response as BriefingSummary;
+			parsed = response as IndexedAIResult;
 		}
 	} else {
 		throw new Error(`Unexpected AI summary response: ${String(response)}`);
 	}
 
+	const resolveSection = (
+		entries: IndexedEntry[] | undefined,
+		candidates: ClassifiedItem[],
+	) => {
+		if (!Array.isArray(entries)) return [];
+		return entries
+			.slice(0, 3)
+			.map((e) => {
+				// AI returns 1-based index; tolerate slight off-by-ones with bounds check
+				const idx = Number.isInteger(e.index) ? e.index - 1 : -1;
+				const item = idx >= 0 && idx < candidates.length ? candidates[idx] : null;
+				if (!item) return null;
+				return {
+					title: item.title,
+					line: e.line ?? "",
+					url: item.url,
+				};
+			})
+			.filter((x): x is { title: string; line: string; url: string } => x !== null);
+	};
+
 	return {
-		positives: Array.isArray(parsed.positives) ? parsed.positives.slice(0, 3) : [],
-		negatives: Array.isArray(parsed.negatives) ? parsed.negatives.slice(0, 3) : [],
-		questions: Array.isArray(parsed.questions) ? parsed.questions.slice(0, 3) : [],
+		positives: resolveSection(parsed.positives, positiveCandidates),
+		negatives: resolveSection(parsed.negatives, negativeCandidates),
+		questions: resolveSection(parsed.questions, questionCandidates),
 	};
 }

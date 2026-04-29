@@ -87,10 +87,18 @@ export interface SourcePost {
 	channel?: string;
 }
 
-// Briefing summary shape — extended in v1.1 with `questions` for Q&A items.
+// Briefing summary shape — v1.2: each entry carries the resolved url so
+// renderers don't need to do their own title→url lookup (which was fragile
+// because the AI editorializes titles when summarizing — strips prefixes
+// like "[r/CloudFlare]" and "Comment on:" — breaking exact-title matches).
+export interface SummaryEntry {
+	title: string;
+	line: string;
+	url: string; // resolved server-side from candidate index; "" if not resolvable
+}
 export interface BriefingSummary {
-	positives: { title: string; line: string }[];
-	negatives: { title: string; line: string }[];
-	questions: { title: string; line: string }[];
+	positives: SummaryEntry[];
+	negatives: SummaryEntry[];
+	questions: SummaryEntry[];
 }
 
