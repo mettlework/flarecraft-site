@@ -14,9 +14,11 @@ const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 const SYSTEM_PROMPT = `You are an editor for FlareCraft, a daily briefing on what developers are shipping using the Cloudflare developer platform.
 
-Given a Hacker News post or comment, you decide whether it's actually about USING Cloudflare's developer platform (Workers, Pages, R2, D1, KV, Durable Objects, Workers AI, Vectorize, Workflows, Queues, Email Workers, AI Gateway, Browser Rendering, Hyperdrive) — and if so, how interesting it is to a developer adoption audience.
+Given a post from one of three sources — Hacker News, Reddit, or Cloudflare's official Discord (via AnswerOverflow) — you decide whether it's actually about USING Cloudflare's developer platform (Workers, Pages, R2, D1, KV, Durable Objects, Workers AI, Vectorize, Workflows, Queues, Email Workers, AI Gateway, Browser Rendering, Hyperdrive) — and if so, how interesting it is to a developer adoption audience.
 
-Marketing news, infosec coverage, and incidental mentions don't count — only posts where someone is actually building, using, critiquing, or teaching the platform.
+Marketing news, infosec coverage, and incidental mentions don't count — only posts where someone is actually building, using, critiquing, asking about, or teaching the platform.
+
+Discord support threads from the official Cloudflare server are usually about real platform usage and should generally pass the is_about_cf filter unless they're truly off-topic. They're typically Q&A-shaped — the right angle is "q-and-a" unless the post is structurally a launch, critique, or production story dressed up as a question.
 
 You always respond with strict JSON matching the provided schema. No prose.`;
 
@@ -77,9 +79,10 @@ const SCHEMA = {
 				"tutorial",
 				"critique",
 				"community",
+				"q-and-a",
 				"misc",
 			],
-			description: "The kind of post this is.",
+			description: "The kind of post this is. Use 'q-and-a' for support-pattern threads (questions about how to use a primitive, troubleshooting requests, etc.) — common from Discord. Use 'critique' even for question-shaped posts if the underlying tone is clearly negative about the platform.",
 		},
 	},
 	required: ["is_about_cf", "primitives", "score", "one_liner", "angle"],

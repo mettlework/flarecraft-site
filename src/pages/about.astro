@@ -17,7 +17,7 @@ const siteUrl = env.SITE_URL ?? "https://flarecraft.dev";
 			<span class="eyebrow">About</span>
 			<h1 class="serif">The system reporting<br />on the <i>platform</i>.</h1>
 			<p class="lede">
-				FlareCraft is a working artifact built end-to-end on Cloudflare to demonstrate platform fluency, taste, and shipping discipline. This page is the architecture reference and the honest write-up of choices made.
+				FlareCraft is a hands-on evaluation of the Cloudflare developer platform — built using the platform itself. This page is the architecture reference and the honest write-up of choices made.
 			</p>
 		</header>
 
@@ -32,13 +32,13 @@ const siteUrl = env.SITE_URL ?? "https://flarecraft.dev";
 			<figure class="arch-figure">
 				<img
 					src="/brand/architecture.svg"
-					alt="FlareCraft architecture diagram. Two Cloudflare Workers — flarecraft-pipeline and flarecraft-site — share data via D1, Vectorize, and R2. The pipeline runs on a daily Cron Trigger, fetches from Hacker News and five Reddit subs, classifies and embeds via Workers AI, dedupes via Vectorize, and persists to D1 and R2. The site Worker reads from D1 in the SSR request path. Beehiiv handles public subscribe and Resend handles email delivery."
+					alt="FlareCraft architecture diagram. Two Cloudflare Workers — flarecraft-pipeline and flarecraft-site — share data via D1, Vectorize, and R2. The pipeline runs on a daily Cron Trigger, fetches from Hacker News, five Reddit subs, and Cloudflare's Discord (via AnswerOverflow's MCP server), classifies and embeds via Workers AI, dedupes via Vectorize, and persists to D1 and R2. The site Worker reads from D1 in the SSR request path. Beehiiv handles public subscribe and Resend handles email delivery."
 					loading="lazy"
 				/>
-				<figcaption><em>Eight Cloudflare primitives. Two Workers. One product.</em></figcaption>
+				<figcaption><em>Eight Cloudflare primitives. Three sources. Two Workers. One product.</em></figcaption>
 			</figure>
 
-			<p>Two Workers in one repo, sharing eight Cloudflare primitives plus two external services:</p>
+			<p>Two Workers in one repo, sharing eight Cloudflare primitives plus three external services (Beehiiv for audience, Resend for delivery, AnswerOverflow's MCP server for Discord):</p>
 
 			<dl class="primitives-list">
 				<div>
@@ -83,7 +83,11 @@ const siteUrl = env.SITE_URL ?? "https://flarecraft.dev";
 				</div>
 				<div>
 					<dt class="serif">Resend (external)</dt>
-					<dd>Transport layer for the daily digest. Single POST per send, no SDK weight. Sender will switch from <code>onboarding@resend.dev</code> to <code>notes@flarecraft.dev</code> once SPF/DKIM records are verified.</dd>
+					<dd>Transport layer for the daily digest. Single POST per send, no SDK weight. Sends from <code>notes@flarecraft.dev</code> via verified domain (SPF/DKIM/DMARC auto-written to the Cloudflare zone by Resend's add-domain integration — a great two-platform handshake).</dd>
+				</div>
+				<div>
+					<dt class="serif">AnswerOverflow (external) — via MCP</dt>
+					<dd>Cloudflare's developer community lives in <a href="https://discord.gg/cloudflaredev" target="_blank" rel="noopener">Discord</a> (89,684 members in the official guild). We can't directly index Discord without violating its TOS, so we go through <a href="https://www.answeroverflow.com/c/595317990191398933" target="_blank" rel="noopener">AnswerOverflow</a> — an open-source community indexer that the Cloudflare server has chosen to surface in. AO exposes a public <a href="https://www.answeroverflow.com/mcp" target="_blank" rel="noopener">MCP server</a>, so the integration is server-to-server JSON-RPC, no scraping. We run a battery of platform-keyword searches scoped to the Cloudflare guild (<code>serverId: 595317990191398933</code>), filter by recency (7-day window), and feed the resulting Q&A threads through the same classifier as HN and Reddit — with a new <code>q-and-a</code> angle and a structurally-derived <code>resolved</code> boolean from AO's <code>solution</code> field.</dd>
 				</div>
 			</dl>
 
@@ -92,7 +96,7 @@ const siteUrl = env.SITE_URL ?? "https://flarecraft.dev";
 				<li><strong>Cloudflare Agents SDK.</strong> Considered and rejected. Agents SDK is shaped for stateful chat/tool-use agents on top of Durable Objects. FlareCraft is a stateless scheduled pipeline — Workflows is the correct abstraction. Picking a primitive because it's trendy is anti-signal.</li>
 				<li><strong>Hash-on-URL deduplication.</strong> Cheaper, but lets near-duplicates through. Vectorize embedding similarity catches semantic redundancy — same launch posted in three different threads — which is the actual shape of the dedup problem.</li>
 				<li><strong>Per-post Workflow steps.</strong> Tempting (clean checkpoints!), but each step is a state-machine transition with metadata overhead. For batch processing the inner loop goes inside one <code>step.do</code>; outer steps mark phases.</li>
-				<li><strong>Reddit and dev.to ingestion.</strong> Scoped out of v1 to ship clean. Adding sources is a single function in <code>pipeline/src/lib/</code> returning <code>SourcePost[]</code>. Schema is source-agnostic.</li>
+				<li><strong>dev.to and Lobsters ingestion.</strong> Scoped out for now. The schema is source-agnostic; adding a source is a single function in <code>pipeline/src/lib/</code> returning <code>SourcePost[]</code>. Hacker News, Reddit, and the Cloudflare Discord (via AnswerOverflow's MCP server) are live.</li>
 				<li><strong>Browser Rendering.</strong> Most HN posts that matter are link posts; title plus excerpt is enough signal. Browser Rendering would add latency and cost without clear recall gains at this scale.</li>
 				<li><strong>One Worker doing everything.</strong> Astro v6's <code>@astrojs/cloudflare</code> adapter doesn't natively host a Workflow class export. Two-Worker split is the cleaner production pattern anyway.</li>
 			</ul>
@@ -109,6 +113,7 @@ const siteUrl = env.SITE_URL ?? "https://flarecraft.dev";
 						<li>Vectorize's <code>returnMetadata</code> takes <code>"none" | "indexed" | "all"</code>, not booleans.</li>
 						<li>Workers Free's 50 subrequest/invocation limit pooled across the workflow — fixed with <code>step.sleep</code> + Workers Paid upgrade.</li>
 						<li>Beehiiv's Posts API is enterprise-tier-only; the runtime 403 forced the dual-platform architecture.</li>
+						<li>AnswerOverflow's web pages are protected by Vercel's security challenge — Cloudflare Workers can't solve those without Browser Rendering. The MCP server is the legitimate path and is, refreshingly, the path AO actually wants AI agents to take.</li>
 					</ul>
 				</li>
 			</ul>

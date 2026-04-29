@@ -18,8 +18,8 @@ CREATE TABLE IF NOT EXISTS briefings (
 CREATE TABLE IF NOT EXISTS items (
 	id TEXT PRIMARY KEY, -- stable hash of source+source_id
 	briefing_id TEXT NOT NULL,
-	source TEXT NOT NULL, -- 'hn' (more later)
-	source_id TEXT NOT NULL, -- HN object id
+	source TEXT NOT NULL, -- 'hn' | 'reddit' | 'answer-overflow'
+	source_id TEXT NOT NULL,
 	url TEXT NOT NULL,
 	title TEXT NOT NULL,
 	author TEXT,
@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS items (
 	primitives TEXT, -- JSON array of primitive names ('Workers','D1',...)
 	score INTEGER, -- 1-5 interestingness score from the model
 	one_liner TEXT, -- 1-2 sentence synthesis from the model
-	angle TEXT, -- short tag of the angle ('production-story','perf-win','OSS','launch','tutorial','critique','community')
+	angle TEXT, -- 'production-story'|'perf-win'|'OSS'|'launch'|'tutorial'|'critique'|'community'|'q-and-a'|'misc'
+	resolved INTEGER DEFAULT NULL, -- Q&A items only: 0=unresolved, 1=resolved, NULL=N/A
 	-- Bookkeeping
 	embedding_id TEXT, -- Vectorize vector id
 	archived_key TEXT, -- R2 key for raw HTML (if archived)

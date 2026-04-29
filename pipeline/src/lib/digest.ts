@@ -74,8 +74,8 @@ function renderHtml(p: DigestPayload, siteUrl: string): string {
 	// "The cut" — editorial summary block above the items list
 	const summaryHtml = (() => {
 		if (!p.summary) return "";
-		const { positives, negatives } = p.summary;
-		if (positives.length === 0 && negatives.length === 0) return "";
+		const { positives, negatives, questions } = p.summary;
+		if (positives.length === 0 && negatives.length === 0 && questions.length === 0) return "";
 
 		// Title→url lookup so summary entries link to their source posts.
 		const urlByTitle = new Map<string, string>();
@@ -108,13 +108,17 @@ function renderHtml(p: DigestPayload, siteUrl: string): string {
 
 		// Single column always — two-column tables collapse poorly in Gmail
 		// mobile and most email clients won't honor media queries reliably.
+		const sections: string[] = [];
+		if (positives.length > 0) sections.push(renderSection("What's working", positives, "+ ", "#e35a14", sections.length === 0));
+		if (negatives.length > 0) sections.push(renderSection("What's friction", negatives, "− ", "#6b675e", sections.length === 0));
+		if (questions.length > 0) sections.push(renderSection("What's being asked", questions, "? ", "#b03a0d", sections.length === 0));
+
 		return `
 <div style="margin:24px 0 32px;padding:20px 22px;background:#f3efe8;border-left:3px solid #e35a14;border-radius:0 4px 4px 0;">
 	<div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#e35a14;font-weight:600;margin-bottom:14px;">
 		The cut · today's read
 	</div>
-	${renderSection("What's working", positives, "+ ", "#e35a14", true)}
-	${renderSection("What's friction", negatives, "− ", "#6b675e", false)}
+	${sections.join("")}
 </div>`;
 	})();
 
@@ -155,7 +159,7 @@ function renderHtml(p: DigestPayload, siteUrl: string): string {
 				What developers are shipping<br>on Cloudflare
 			</h1>
 			<p style="font-size:15px;color:#3a3a36;margin:0 0 24px;">
-				${p.items.length} item${p.items.length === 1 ? "" : "s"} from Hacker News and Reddit in the last 24 hours, classified and ranked by Workers AI.
+				${p.items.length} item${p.items.length === 1 ? "" : "s"} from Hacker News, Reddit, and Cloudflare's Discord — classified and ranked by Workers AI.
 			</p>
 			${summaryHtml}
 			<table width="100%" cellpadding="0" cellspacing="0" border="0">${itemsHtml}</table>

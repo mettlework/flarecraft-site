@@ -27,16 +27,20 @@ const POSITIVE_ANGLES = new Set([
 	"tutorial",
 ]);
 const NEGATIVE_ANGLES = new Set(["critique"]);
+const QUESTION_ANGLES = new Set(["q-and-a"]);
 
 const SYSTEM_PROMPT = `You are the editor of FlareCraft, a daily briefing of what developers are shipping on the Cloudflare developer platform.
 
-Given a list of classified items from the last 24 hours, you write the day's editorial summary: the top 3 most positive developments and the top 3 most concerning items.
+Given a list of classified items from the last 24 hours (plus the past week of Discord activity), you write the day's editorial summary in three sections:
+- the top 3 most positive developments (launches, wins, impressive builds)
+- the top 3 most concerning items (critiques, friction, outage stories)
+- the top 3 most editorially-interesting questions developers are asking (from the Cloudflare Discord)
 
-For each item you select, write ONE crisp editorial sentence (max 28 words) capturing why a developer adoption audience should care. Use plain prose, not marketing copy. Reference Cloudflare primitives by name when relevant.
+For each item you select, write ONE crisp editorial sentence (max 28 words) capturing why a developer adoption audience should care. Use plain prose, not marketing copy. Reference Cloudflare primitives by name when relevant. For questions, framing should be observational ("Several developers are wrestling with X") not transactional.
 
 Always respond with strict JSON matching the schema. Never include items not present in the input.
 
-If there are fewer than 3 items in either category, return what you have (do not invent).`;
+If there are fewer than 3 items in any category, return what you have (do not invent).`;
 
 const SCHEMA = {
 	type: "object",
@@ -65,8 +69,20 @@ const SCHEMA = {
 				required: ["title", "line"],
 			},
 		},
+		questions: {
+			type: "array",
+			maxItems: 3,
+			items: {
+				type: "object",
+				properties: {
+					title: { type: "string", description: "Exact title of a Q&A thread" },
+					line: { type: "string", description: "1-sentence editorial framing of what the community is asking, max 28 words" },
+				},
+				required: ["title", "line"],
+			},
+		},
 	},
-	required: ["positives", "negatives"],
+	required: ["positives", "negatives", "questions"],
 } as const;
 
 export async function generateSummary(
@@ -75,33 +91,44 @@ export async function generateSummary(
 ): Promise<BriefingSummary> {
 	const positiveCandidates = items.filter((i) => POSITIVE_ANGLES.has(i.angle));
 	const negativeCandidates = items.filter((i) => NEGATIVE_ANGLES.has(i.angle));
+	const questionCandidates = items.filter((i) => QUESTION_ANGLES.has(i.angle));
 
 	// Empty briefing → empty summary, skip the AI call
-	if (positiveCandidates.length === 0 && negativeCandidates.length === 0) {
-		return { positives: [], negatives: [] };
+	if (
+		positiveCandidates.length === 0 &&
+		negativeCandidates.length === 0 &&
+		questionCandidates.length === 0
+	) {
+		return { positives: [], negatives: [], questions: [] };
 	}
 
+	const renderCandidates = (
+		cands: ClassifiedItem[],
+		extraTag?: (i: ClassifiedItem) => string,
+	) =>
+		cands.length > 0
+			? cands
+					.map((i, idx) => {
+						const tags = [
+							`score ${i.score}/5`,
+							`primitives: ${parsePrimitives(i.primitives).join(", ") || "n/a"}`,
+						];
+						if (extraTag) tags.push(extraTag(i));
+						return `${idx + 1}. [${tags.join(", ")}] ${i.title}\n   ${i.one_liner}`;
+					})
+					.join("\n\n")
+			: "(none in this category)";
+
 	const userMessage = `POSITIVE CANDIDATES (launches, wins, production stories, OSS, tutorials):
-${positiveCandidates
-	.map(
-		(i, idx) =>
-			`${idx + 1}. [score ${i.score}/5, primitives: ${parsePrimitives(i.primitives).join(", ") || "n/a"}] ${i.title}\n   ${i.one_liner}`,
-	)
-	.join("\n\n")}
+${renderCandidates(positiveCandidates)}
 
 NEGATIVE CANDIDATES (critiques, outages, friction):
-${
-	negativeCandidates.length > 0
-		? negativeCandidates
-				.map(
-					(i, idx) =>
-						`${idx + 1}. [score ${i.score}/5] ${i.title}\n   ${i.one_liner}`,
-				)
-				.join("\n\n")
-		: "(none today)"
-}
+${renderCandidates(negativeCandidates)}
 
-Pick the top 3 from each (or fewer if the list is shorter).`;
+QUESTION CANDIDATES (Discord support patterns from the Cloudflare guild):
+${renderCandidates(questionCandidates, (i) => `${i.resolved === 1 ? "resolved" : "open"}`)}
+
+Pick the top 3 from each (or fewer if the list is shorter). For questions, prioritize threads that reveal interesting platform usage patterns or recurring confusion — not one-offs.`;
 
 	const response = (await env.AI.run(MODEL, {
 		messages: [
@@ -131,5 +158,6 @@ Pick the top 3 from each (or fewer if the list is shorter).`;
 	return {
 		positives: Array.isArray(parsed.positives) ? parsed.positives.slice(0, 3) : [],
 		negatives: Array.isArray(parsed.negatives) ? parsed.negatives.slice(0, 3) : [],
+		questions: Array.isArray(parsed.questions) ? parsed.questions.slice(0, 3) : [],
 	};
 }

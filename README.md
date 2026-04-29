@@ -25,9 +25,10 @@ A daily briefing of what developers are shipping on a platform is exactly the ki
 
 Every day at 07:00 CT a Cloudflare Cron Trigger fires. A Workflow runs that:
 
-1. **Fetches** the last 24 hours of posts mentioning Cloudflare from two source classes:
-   - **Hacker News** (stories + comments) via the Algolia HN API
+1. **Fetches** posts about the Cloudflare developer platform from three source classes:
+   - **Hacker News** (stories + comments, last 24h) via the Algolia HN API
    - **Reddit** — r/CloudFlare and r/cloudflaredev (whole-sub on-topic), plus search-within-sub for "cloudflare" mentions on r/aws, r/vercel, and r/selfhosted (where the comparison/migration stories live)
+   - **Cloudflare Discord** (last 7 days) — the official Cloudflare Developers guild (`595317990191398933`, ~89k members) via [AnswerOverflow's public MCP server](https://www.answeroverflow.com/mcp). A battery of platform-keyword searches scoped to the Cloudflare server, filtered by recency. Discord is a weekly-pulse signal, not daily — search is relevance-sorted, so a 7-day window is the right granularity.
 2. **Classifies** each post via Workers AI (Llama 3.3 70B with structured JSON output): is this actually about building on the platform, which primitives are involved, what's the angle, and how interesting is it on a 1–5 scale
 3. **Embeds** each kept post via Workers AI (BGE base, 768 dims) and queries Vectorize for the nearest neighbor in the existing corpus — if cosine similarity ≥ 0.92, treats it as a semantic duplicate and skips
 4. **Persists** survivors to D1, archives raw normalized JSON to R2 keyed by `date/source/id`
@@ -110,8 +111,9 @@ A separate SSR Worker reads from D1 in the request path and renders the live bri
 External dependencies:
 - **Beehiiv** — public subscribe page at `flare-craft.beehiiv.com`. Audience layer (the *who*: subscribers, growth, archive, list management).
 - **Resend** — transactional email transport. Single POST per send, no SDK weight.
+- **AnswerOverflow** — public MCP server at `https://www.answeroverflow.com/mcp` for indexing the Cloudflare Discord guild. We can't directly index Discord without violating its TOS; AO is the legitimate, MIT-licensed open-source path, and it explicitly invites AI agents via MCP. Server-to-server JSON-RPC, no scraping.
 
-The dual-platform split is deliberate: Beehiiv's programmatic publish API is gated to enterprise tier, which surfaced as a 403 at runtime. Rather than pay $39/mo for an unjustified primitive, the architecture separates audience capture (Beehiiv) from delivery (Resend) — which is how many real newsletter products operate. Subscribers join via Beehiiv; the daily digest goes out via Resend. The bridge between them — sync Beehiiv subscribers → Resend audience and send to the list — is a single function in `pipeline/src/lib/`, queued for v2.
+The dual-platform email split is deliberate: Beehiiv's programmatic publish API is gated to enterprise tier, which surfaced as a 403 at runtime. Rather than pay $39/mo for an unjustified primitive, the architecture separates audience capture (Beehiiv) from delivery (Resend) — which is how many real newsletter products operate. Subscribers join via Beehiiv; the daily digest goes out via Resend. The bridge between them — sync Beehiiv subscribers → Resend audience and send to the list — is a single function in `pipeline/src/lib/`, queued for v2.
 
 ---
 
@@ -120,7 +122,7 @@ The dual-platform split is deliberate: Beehiiv's programmatic publish API is gat
 - **Cloudflare Agents SDK.** Considered and rejected. Agents SDK is shaped for stateful chat/tool-use agents on top of Durable Objects. FlareCraft is a stateless scheduled pipeline — Workflows is the correct abstraction. Picking a primitive because it's trendy is anti-signal.
 - **Hash-on-URL deduplication.** Cheaper, but lets near-duplicates through. Vectorize embedding similarity catches the case where the same launch gets posted across multiple HN threads — semantic redundancy, which is the actual shape of the dedup problem.
 - **Per-post Workflow steps.** Tempting (clean checkpoints!), but each step is a state-machine transition with metadata overhead. For batch processing the Cloudflare-recommended pattern is the inner loop inside one `step.do` and outer steps marking phases.
-- **dev.to and Lobsters ingestion.** Scoped out for v1 to ship clean. The schema is already source-agnostic; adding a source is a single function in `pipeline/src/lib/` returning `SourcePost[]`. (Hacker News and five Reddit subs are live.)
+- **dev.to and Lobsters ingestion.** Scoped out for now. The schema is already source-agnostic; adding a source is a single function in `pipeline/src/lib/` returning `SourcePost[]`. (Hacker News, five Reddit subs, and the Cloudflare Discord via AnswerOverflow's MCP server are live.)
 - **Browser Rendering.** Most HN posts that matter are link posts; title plus an excerpt is enough signal. Browser Rendering would add latency and cost without clear recall gains at this scale.
 - **One Worker doing everything.** Astro v6's `@astrojs/cloudflare` adapter doesn't natively host a Workflow class export, which forces a two-Worker split. The cleaner production pattern is honest separation anyway.
 
@@ -135,6 +137,7 @@ The dual-platform split is deliberate: Beehiiv's programmatic publish API is gat
   - Vectorize's `returnMetadata` parameter accepts `"none" | "indexed" | "all"`, not booleans — type errors only at runtime.
   - Wrangler 4's experimental auto-provisioning created the missing `SESSION` KV namespace on the fly during deploy — beautiful when it works; could surprise a less attentive deployer.
   - The `@astrojs/cloudflare` adapter tree-shakes `cloudflare:workers` env imports out of pages that don't reference env directly, even when a child layout component does — causing a runtime `ReferenceError: env is not defined` only on those pages. Fix: anchor with a real `env.X` read in each page's frontmatter. Subtle bug; only visible in production.
+  - **AnswerOverflow's web pages are protected by Vercel's security challenge** — Cloudflare Workers can't solve those challenges without Browser Rendering. The `.md` endpoint and HTML scraping paths are dead from a Worker. Their MCP server is the legitimate path and is, refreshingly, the path AO actually wants AI agents to take. Also: AO's tool surface doesn't expose channel-listing, so we run a query battery instead of a channel sweep — which is editorially better (a daily briefing is keyword-shaped, not channel-shaped) but worth knowing about.
   - Workers Free's 50 subrequest/invocation limit pooled across the entire workflow run, not per `step.do` as I'd assumed. The `send-digest` step inherited an exhausted budget. Fix: a `step.sleep` checkpoint before digest forces a fresh invocation. Belt-and-suspenders: also upgraded to Workers Paid for the 1,000 subrequest ceiling.
   - Beehiiv's Posts API (programmatic publish) is enterprise-tier-only. The runtime 403 forced the Beehiiv-for-audience + Resend-for-send split — which turned out to be the more honest architecture.
   - Workflow `step.do` callbacks return `void`, but a long-running step that hits an internal Workflow runtime error retries with the same `step.do` name; on retry the step's prior `console.log` output is lost from the dashboard view (only the retry shows). Made debugging the first kept-count-zero run slower than necessary.
@@ -164,14 +167,15 @@ flarecraft-site/
 │       ├── workflow.ts        # FlareCraftPipeline (WorkflowEntrypoint)
 │       ├── env.ts
 │       └── lib/
-│           ├── hn.ts          # Algolia HN client
-│           ├── reddit.ts      # Reddit public JSON API (5 subreddits)
-│           ├── classify.ts    # Workers AI classification (Llama 3.3 70B)
-│           ├── summary.ts     # Workers AI editorial summary (top 3 + / 3 −)
-│           ├── embed.ts       # Workers AI embeddings (BGE base, 768d)
-│           ├── dedup.ts       # Vectorize dedup
-│           ├── persist.ts     # D1 + R2 writers
-│           └── digest.ts      # Resend email
+│           ├── hn.ts                # Algolia HN client
+│           ├── reddit.ts            # Reddit public JSON API (5 subreddits)
+│           ├── answer-overflow.ts   # Cloudflare Discord via AO's public MCP server
+│           ├── classify.ts          # Workers AI classification (Llama 3.3 70B)
+│           ├── summary.ts           # Workers AI editorial summary (top 3 + / 3 − / 3 ?)
+│           ├── embed.ts             # Workers AI embeddings (BGE base, 768d)
+│           ├── dedup.ts             # Vectorize dedup
+│           ├── persist.ts           # D1 + R2 writers
+│           └── digest.ts            # Resend email
 ├── schema.sql                 # D1 schema
 ├── astro.config.mjs           # Cloudflare adapter, output: server
 └── wrangler.jsonc             # Site Worker config

@@ -17,6 +17,7 @@ export interface BriefingRow {
 export interface BriefingSummary {
 	positives: { title: string; line: string }[];
 	negatives: { title: string; line: string }[];
+	questions: { title: string; line: string }[];
 }
 
 export function parseSummary(raw: string | null): BriefingSummary | null {
@@ -29,7 +30,12 @@ export function parseSummary(raw: string | null): BriefingSummary | null {
 			Array.isArray(v.positives) &&
 			Array.isArray(v.negatives)
 		) {
-			return v as BriefingSummary;
+			// Backward-compatible: old summaries (pre v1.1) don't have `questions`.
+			return {
+				positives: v.positives,
+				negatives: v.negatives,
+				questions: Array.isArray(v.questions) ? v.questions : [],
+			};
 		}
 	} catch {
 		// fall through
@@ -51,6 +57,7 @@ export interface ItemRow {
 	score: number;
 	one_liner: string;
 	angle: string;
+	resolved: number | null;
 	embedding_id: string | null;
 	archived_key: string | null;
 	created_at: number;

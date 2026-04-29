@@ -24,6 +24,7 @@ import {
 import type { ClassifiedItem, Env, SourcePost } from "./env";
 import { fetchHN } from "./lib/hn";
 import { fetchReddit } from "./lib/reddit";
+import { fetchAnswerOverflow } from "./lib/answer-overflow";
 import { classify } from "./lib/classify";
 import { embed } from "./lib/embed";
 import { dedupAndRegister } from "./lib/dedup";
@@ -64,14 +65,16 @@ export class FlareCraftPipeline extends WorkflowEntrypoint<
 		// 2. Pull source posts from all configured sources.
 		// Sources run in parallel within the step; failures of one don't fail
 		// the others (each fetcher catches its own).
+		// AO uses a 7-day window (relevance-sorted, not time-sorted — Discord
+		// is a weekly-pulse signal). HN and Reddit use the request's hoursBack.
 		const posts: SourcePost[] = await step.do(
 			"fetch-sources",
 			{
 				retries: { limit: 3, delay: "10 seconds", backoff: "exponential" },
-				timeout: "60 seconds",
+				timeout: "120 seconds",
 			},
 			async () => {
-				const [hnPosts, redditPosts] = await Promise.all([
+				const [hnPosts, redditPosts, aoPosts] = await Promise.all([
 					fetchHN(hoursBack).catch((e) => {
 						console.warn("HN fetch failed:", e);
 						return [] as SourcePost[];
@@ -80,11 +83,15 @@ export class FlareCraftPipeline extends WorkflowEntrypoint<
 						console.warn("Reddit fetch failed:", e);
 						return [] as SourcePost[];
 					}),
+					fetchAnswerOverflow(168).catch((e) => {
+						console.warn("AnswerOverflow fetch failed:", e);
+						return [] as SourcePost[];
+					}),
 				]);
 				console.log(
-					`Sources: HN=${hnPosts.length} Reddit=${redditPosts.length}`,
+					`Sources: HN=${hnPosts.length} Reddit=${redditPosts.length} AO=${aoPosts.length}`,
 				);
-				return [...hnPosts, ...redditPosts];
+				return [...hnPosts, ...redditPosts, ...aoPosts];
 			},
 		);
 

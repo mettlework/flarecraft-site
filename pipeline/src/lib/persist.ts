@@ -67,12 +67,19 @@ export async function persistItem(
 	embeddingId: string | null,
 	archivedKey: string | null,
 ): Promise<void> {
+	// `resolved` is structural for AO (derived from MCP's solution field).
+	// For non-Q&A sources or non-Q&A angles, leave it NULL.
+	let resolved: 0 | 1 | null = null;
+	if (post.source === "answer-overflow" && classification.angle === "q-and-a") {
+		resolved = post.resolved === 1 ? 1 : 0;
+	}
+
 	await env.DB.prepare(
 		`INSERT OR IGNORE INTO items
 		 (id, briefing_id, source, source_id, url, title, author, posted_at,
-		  is_about_cf, primitives, score, one_liner, angle,
+		  is_about_cf, primitives, score, one_liner, angle, resolved,
 		  embedding_id, archived_key, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	)
 		.bind(
 			itemId(post),
@@ -88,6 +95,7 @@ export async function persistItem(
 			classification.score,
 			classification.one_liner,
 			classification.angle,
+			resolved,
 			embeddingId,
 			archivedKey,
 			Date.now(),

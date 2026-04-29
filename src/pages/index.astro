@@ -76,6 +76,17 @@ const lastRunRelative = (() => {
 	const days = Math.floor(hours / 24);
 	return `${days}d ago`;
 })();
+
+// Display label for the source — "answer-overflow" → "Discord" because that's
+// what the user is actually reading; AO is the access mechanism, not the surface.
+function sourceLabel(source: string): string {
+	switch (source) {
+		case "hn": return "HN";
+		case "reddit": return "Reddit";
+		case "answer-overflow": return "Discord";
+		default: return source;
+	}
+}
 ---
 
 <Layout
@@ -90,11 +101,11 @@ const lastRunRelative = (() => {
 					What developers are shipping<br />on <i>Cloudflare</i>
 				</h1>
 				<p class="lede">
-					The last 24 hours, classified and ranked by Workers AI.
+					The last 24 hours from Hacker News and Reddit, plus the past week from Cloudflare's developer Discord — classified and ranked by Workers AI.
 				</p>
 				<div class="hero-meta">
 					<p class="hero-meta-line serif italic">
-						8 Cloudflare primitives <span class="hero-dot">·</span> 2 Workers
+						8 Cloudflare primitives <span class="hero-dot">·</span> 2 Workers <span class="hero-dot">·</span> 3 sources
 					</p>
 					<p class="hero-meta-line hero-meta-bottom">
 						<span class="serif italic">1 daily briefing.</span>
@@ -103,7 +114,7 @@ const lastRunRelative = (() => {
 				</div>
 			</header>
 
-			{summary && (summary.positives.length > 0 || summary.negatives.length > 0) && (
+			{summary && (summary.positives.length > 0 || summary.negatives.length > 0 || summary.questions.length > 0) && (
 				<section class="cut">
 					<span class="eyebrow">The cut &middot; today's read</span>
 					<div class="cut-grid">
@@ -151,6 +162,28 @@ const lastRunRelative = (() => {
 								</ol>
 							</div>
 						)}
+						{summary.questions.length > 0 && (
+							<div class="cut-col cut-col--qa">
+								<h3 class="serif">What's being asked</h3>
+								<ol>
+									{summary.questions.map((p) => {
+										const url = urlForTitle(p.title);
+										return (
+											<li>
+												{url ? (
+													<a href={url} target="_blank" rel="noopener" class="cut-link">
+														<strong>{p.title}.</strong>
+													</a>
+												) : (
+													<strong>{p.title}.</strong>
+												)}
+												<span> {p.line}</span>
+											</li>
+										);
+									})}
+								</ol>
+							</div>
+						)}
 					</div>
 				</section>
 			)}
@@ -180,8 +213,11 @@ const lastRunRelative = (() => {
 											{"★".repeat(item.score)}{"☆".repeat(5 - item.score)}
 											{" · "}
 											{item.angle}
+											{item.resolved !== null && (
+												<>{" · "}{item.resolved === 1 ? "resolved" : "open"}</>
+											)}
 											{" · "}
-											via {item.source}
+											via {sourceLabel(item.source)}
 										</span>
 									</div>
 									<h2 class="serif">
@@ -362,13 +398,16 @@ const lastRunRelative = (() => {
 	}
 	.cut-grid {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 32px;
+		/* auto-fit: 3 columns when room (positives + negatives + questions),
+		   2 when only two sections have content, 1 on narrow viewports.
+		   minmax floor of 200px keeps prose legible at every breakpoint. */
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: 28px;
 	}
 	@media (max-width: 760px) {
 		.cut-grid {
 			grid-template-columns: 1fr;
-			gap: 24px;
+			gap: 22px;
 		}
 	}
 	.cut-col h3 {
@@ -387,6 +426,12 @@ const lastRunRelative = (() => {
 	.cut-col--neg h3::before {
 		content: "− ";
 		color: var(--ink-3);
+		font-family: var(--font-mono);
+		font-weight: 600;
+	}
+	.cut-col--qa h3::before {
+		content: "? ";
+		color: var(--ember);
 		font-family: var(--font-mono);
 		font-weight: 600;
 	}

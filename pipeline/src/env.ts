@@ -30,7 +30,7 @@ export interface Env {
 	RESEND_API_KEY: string;
 }
 
-export type SourceName = "hn" | "reddit";
+export type SourceName = "hn" | "reddit" | "answer-overflow";
 
 // Shape of items stored in D1 — matches schema.sql
 export interface ClassifiedItem {
@@ -47,6 +47,7 @@ export interface ClassifiedItem {
 	score: number;
 	one_liner: string;
 	angle: string;
+	resolved: 0 | 1 | null; // Q&A items only; NULL for non-Q&A sources
 	embedding_id: string | null;
 	archived_key: string | null;
 	created_at: number;
@@ -66,6 +67,7 @@ export interface Classification {
 		| "tutorial"
 		| "critique"
 		| "community"
+		| "q-and-a"
 		| "misc";
 }
 
@@ -78,10 +80,17 @@ export interface SourcePost {
 	body: string; // raw text for classification context
 	author: string | null;
 	posted_at: number; // ms
+	// AO threads carry pre-classified resolution state (solution !== null).
+	// We pass it through here so persist.ts can write it without an AI call.
+	resolved?: 0 | 1 | null;
+	// AO threads include the channel they were posted in. Useful editorial meta.
+	channel?: string;
 }
 
-// Summary attached to each completed briefing — top-3 positives + top-3 negatives
+// Briefing summary shape — extended in v1.1 with `questions` for Q&A items.
 export interface BriefingSummary {
 	positives: { title: string; line: string }[];
 	negatives: { title: string; line: string }[];
+	questions: { title: string; line: string }[];
 }
+

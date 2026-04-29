@@ -55,17 +55,25 @@
 	</g>
 
 	<g><!-- Reddit -->
-		<rect x="64" y="304" width="200" height="108" rx="3" class="box" />
+		<rect x="64" y="304" width="200" height="92" rx="3" class="box" />
 		<text x="80" y="330" class="t-card-h">Reddit</text>
 		<text x="80" y="350" class="t-source-meta">5 subreddits, public JSON API</text>
-		<text x="80" y="370" class="t-primitive">r/CloudFlare · r/cloudflaredev</text>
-		<text x="80" y="388" class="t-primitive">r/aws · r/vercel</text>
-		<text x="80" y="404" class="t-primitive">r/selfhosted</text>
+		<text x="80" y="368" class="t-primitive">r/CloudFlare · r/cloudflaredev</text>
+		<text x="80" y="384" class="t-primitive">r/aws · r/vercel · r/selfhosted</text>
+	</g>
+
+	<g><!-- Discord (via AnswerOverflow MCP) -->
+		<rect x="64" y="416" width="200" height="92" rx="3" class="box" />
+		<text x="80" y="442" class="t-card-h">Discord</text>
+		<text x="80" y="462" class="t-source-meta">Cloudflare Developers guild</text>
+		<text x="80" y="480" class="t-source-meta">89,684 members · 7-day window</text>
+		<text x="80" y="498" class="t-primitive">via AnswerOverflow MCP</text>
 	</g>
 
 	<!-- Sources → Pipeline arrows -->
 	<path d="M 264 246 L 318 246" class="arrow" marker-end="url(#arr)" />
-	<path d="M 264 358 L 318 358" class="arrow" marker-end="url(#arr)" />
+	<path d="M 264 350 L 318 320" class="arrow" marker-end="url(#arr)" />
+	<path d="M 264 462 L 318 400" class="arrow" marker-end="url(#arr)" />
 
 	<!-- PIPELINE WORKER (center) -->
 	<g>
@@ -210,6 +218,6 @@
 
 	<!-- BOTTOM CAPTION -->
 	<line x1="64" y1="690" x2="1136" y2="690" class="rule" />
-	<text x="600" y="722" class="t-caption" text-anchor="middle">Eight Cloudflare primitives. Two Workers. One product.</text>
+	<text x="600" y="722" class="t-caption" text-anchor="middle">Eight Cloudflare primitives. Three sources. Two Workers. One product.</text>
 	<rect x="0" y="754" width="1200" height="6" class="ember-bar" />
 </svg>
