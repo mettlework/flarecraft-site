@@ -16,8 +16,12 @@ const itemUrlByTitle = new Map<string, string>();
 for (const item of briefing.items) {
 	itemUrlByTitle.set(item.title.trim(), item.url);
 }
-function urlForTitle(title: string): string | null {
-	return itemUrlByTitle.get(title.trim()) ?? null;
+// v1.2+: each summary entry carries `url` directly (resolved server-side
+// from candidate index in summary.ts). Fallback to title lookup for
+// legacy summaries.
+function urlFor(entry: { title: string; url?: string }): string | null {
+	if (entry.url) return entry.url;
+	return itemUrlByTitle.get(entry.title.trim()) ?? null;
 }
 function sourceLabel(source: string): string {
 	switch (source) {
